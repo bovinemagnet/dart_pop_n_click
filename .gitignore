@@ -1,0 +1,13 @@
+# Dart build artifacts
+.dart_tool/
+build/
+.packages
+
+# Pub cache
+.pub-cache/
+.pub/
+
+# IDE
+.idea/
+.vscode/
+*.iml
