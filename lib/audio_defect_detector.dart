@@ -18,3 +18,4 @@ library audio_defect_detector;
 
 export 'src/analyser.dart';
 export 'src/models.dart';
+export 'src/pcm_decoder.dart';

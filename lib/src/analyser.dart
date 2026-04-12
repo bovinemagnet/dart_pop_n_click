@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'models.dart';
 import 'wav_decoder.dart';
+import 'pcm_decoder.dart';
 import 'detector.dart';
 
 // ---------------------------------------------------------------------------
@@ -59,6 +60,77 @@ Future<AnalysisResult> analyseBytes(
     case _AudioFormat.wav:
       return _analyseWav(bytes, config);
   }
+}
+
+/// Analyse raw PCM [bytes] described by [format] and return an [AnalysisResult].
+///
+/// This is useful when the caller has headerless PCM data (e.g. from a
+/// microphone stream or a raw `.pcm` / `.raw` file) and knows the sample
+/// format up-front.
+///
+/// Throws [CorruptFileException] if byte length is mis-aligned.
+Future<AnalysisResult> analysePcm(
+  Uint8List bytes, {
+  required PcmFormat format,
+  DetectorConfig config = const DetectorConfig(),
+}) async {
+  final channels = decodePcmBytes(bytes, format);
+  return _analyseSamples(channels, format.sampleRate, format, config);
+}
+
+/// Analyse pre-normalised [channelSamples] (values in [-1.0, 1.0]).
+///
+/// The caller must provide a [sampleRate] so that defect offsets can be
+/// expressed in wall-clock time.
+Future<AnalysisResult> analyseSamples(
+  List<Float32List> channelSamples, {
+  required int sampleRate,
+  int bitDepth = 16,
+  DetectorConfig config = const DetectorConfig(),
+}) async {
+  final totalFrames =
+      channelSamples.isEmpty ? 0 : channelSamples[0].length;
+  final durationMs =
+      sampleRate > 0 ? (totalFrames / sampleRate * 1000).round() : 0;
+  final metadata = AudioMetadata(
+    sampleRate: sampleRate,
+    bitDepth: bitDepth,
+    channels: channelSamples.length,
+    duration: Duration(milliseconds: durationMs),
+  );
+
+  final defects = detectDefects(channelSamples, sampleRate, config);
+  final aggregate = computeAggregateConfidence(defects);
+  return AnalysisResult(
+    defects: defects,
+    aggregateConfidence: aggregate,
+    metadata: metadata,
+  );
+}
+
+AnalysisResult _analyseSamples(
+  List<Float32List> channels,
+  int sampleRate,
+  PcmFormat format,
+  DetectorConfig config,
+) {
+  final totalFrames = channels.isEmpty ? 0 : channels[0].length;
+  final durationMs =
+      sampleRate > 0 ? (totalFrames / sampleRate * 1000).round() : 0;
+  final metadata = AudioMetadata(
+    sampleRate: sampleRate,
+    bitDepth: format.bitDepth,
+    channels: format.channels,
+    duration: Duration(milliseconds: durationMs),
+  );
+
+  final defects = detectDefects(channels, sampleRate, config);
+  final aggregate = computeAggregateConfidence(defects);
+  return AnalysisResult(
+    defects: defects,
+    aggregateConfidence: aggregate,
+    metadata: metadata,
+  );
 }
 
 // ---------------------------------------------------------------------------

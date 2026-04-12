@@ -1,6 +1,8 @@
 /// Data models, configuration, and typed exceptions for audio_defect_detector.
 library;
 
+import 'dart:typed_data';
+
 // ---------------------------------------------------------------------------
 // Enumerations
 // ---------------------------------------------------------------------------
@@ -170,6 +172,33 @@ class AnalysisResult {
         },
         'defects': defects.map((d) => d.toJson()).toList(),
       };
+}
+
+// ---------------------------------------------------------------------------
+// Raw PCM format descriptor
+// ---------------------------------------------------------------------------
+
+/// Describes the layout of raw PCM audio data.
+class PcmFormat {
+  final int sampleRate;
+  final int bitDepth;
+  final int channels;
+  final bool isFloat;
+  final Endian endian;
+
+  const PcmFormat({
+    required this.sampleRate,
+    required this.bitDepth,
+    required this.channels,
+    this.isFloat = false,
+    this.endian = Endian.little,
+  });
+
+  /// Bytes per single sample (one channel, one frame).
+  int get bytesPerSample => bitDepth ~/ 8;
+
+  /// Bytes per interleaved frame (all channels).
+  int get bytesPerFrame => bytesPerSample * channels;
 }
 
 // ---------------------------------------------------------------------------

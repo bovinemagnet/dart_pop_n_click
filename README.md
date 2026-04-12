@@ -7,6 +7,8 @@ Pure Dart library to detect pops and clicks in WAV audio files.
 - Detect clicks (1–10 samples) and pops (10–150 samples) in WAV audio
 - Adaptive MAD-based threshold with configurable sensitivity
 - Support for PCM 8/16/24/32-bit and IEEE Float 32-bit WAV files
+- Raw PCM byte analysis without WAV headers
+- Pre-normalised sample analysis for integration with other decoders
 - Per-channel or mono-summed analysis
 - Confidence scoring with logistic function
 - CLI tool with text and JSON output, glob support, and batch processing
@@ -84,6 +86,32 @@ Analyses a `Uint8List` of audio bytes and returns a `Future<AnalysisResult>`.
 
 ---
 
+## Raw PCM Analysis
+
+For audio that has already been decoded to raw PCM bytes (e.g. from FLAC decoders):
+
+```dart
+import 'package:audio_defect_detector/audio_defect_detector.dart';
+
+// Analyse raw 16-bit signed LE stereo PCM bytes
+final result = await analysePcm(
+  pcmBytes,
+  format: PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 2),
+);
+```
+
+For pre-normalised Float32 samples:
+
+```dart
+// samples is List<Float32List> — one per channel, values in [-1.0, 1.0]
+final result = await analyseSamples(
+  samples,
+  sampleRate: 44100,
+);
+```
+
+---
+
 ## CLI: `audiodefect`
 
 Activate globally:
@@ -106,6 +134,11 @@ audiodefect analyse <file|glob> [options]
 | `--output=text\|json` | Output format (default: `text`). |
 | `--quiet` | Suppress all output. |
 | `--verbose` | Show extra diagnostics. |
+| `--raw` | Treat input as raw PCM (no WAV header). |
+| `--sample-rate=N` | Sample rate for raw PCM (default: `44100`). |
+| `--bit-depth=N` | Bit depth for raw PCM: 8, 16, 24, or 32 (default: `16`). |
+| `--channels=N` | Number of channels for raw PCM (default: `2`). |
+| `--float` | Treat raw PCM as IEEE float instead of integer. |
 
 #### Exit codes
 | Code | Meaning |
@@ -144,6 +177,11 @@ $ audiodefect analyse recording.wav --output=json
     "defects": [...]
   }
 }
+```
+
+#### Example — raw PCM analysis
+```
+$ audiodefect analyse recording.raw --raw --sample-rate=48000 --bit-depth=24 --channels=1
 ```
 
 ---

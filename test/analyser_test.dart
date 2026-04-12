@@ -4,6 +4,30 @@ import 'package:test/test.dart';
 import 'package:audio_defect_detector/audio_defect_detector.dart';
 
 // ---------------------------------------------------------------------------
+// Raw PCM builder helpers
+// ---------------------------------------------------------------------------
+
+/// Build raw 16-bit signed LE stereo PCM bytes from two channels of int samples.
+Uint8List buildRawPcm16Stereo(List<int> left, List<int> right, {int? length}) {
+  final n = length ?? left.length;
+  final bd = ByteData(n * 4); // 2 channels * 2 bytes per sample
+  for (var i = 0; i < n; i++) {
+    bd.setInt16(i * 4, left[i], Endian.little);
+    bd.setInt16(i * 4 + 2, right[i], Endian.little);
+  }
+  return bd.buffer.asUint8List();
+}
+
+/// Build raw 16-bit signed LE mono PCM bytes from int samples.
+Uint8List buildRawPcm16Mono(List<int> samples) {
+  final bd = ByteData(samples.length * 2);
+  for (var i = 0; i < samples.length; i++) {
+    bd.setInt16(i * 2, samples[i], Endian.little);
+  }
+  return bd.buffer.asUint8List();
+}
+
+// ---------------------------------------------------------------------------
 // WAV builder helpers (mirrors pattern from wav_decoder_test.dart)
 // ---------------------------------------------------------------------------
 
@@ -141,6 +165,140 @@ void main() {
         () => analyseBytes(buf),
         throwsA(isA<CorruptFileException>()),
       );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // analysePcm()
+  // -------------------------------------------------------------------------
+
+  group('analysePcm()', () {
+    test('detects defects in raw PCM with injected spike', () async {
+      const sampleRate = 44100;
+      // 1 second of stereo silence
+      final left = List<int>.filled(sampleRate, 0);
+      final right = List<int>.filled(sampleRate, 0);
+      // Inject a spike at the midpoint on the left channel
+      left[22050] = 32767;
+      left[22051] = -32767;
+
+      final bytes = buildRawPcm16Stereo(left, right);
+      final format = PcmFormat(
+        sampleRate: sampleRate,
+        bitDepth: 16,
+        channels: 2,
+      );
+
+      final result = await analysePcm(
+        bytes,
+        format: format,
+        config: const DetectorConfig(sensitivity: Sensitivity.high),
+      );
+
+      expect(result.defects, isNotEmpty);
+      expect(result.metadata.sampleRate, equals(sampleRate));
+      expect(result.metadata.channels, equals(2));
+    });
+
+    test('returns no defects for clean sine wave', () async {
+      const sampleRate = 44100;
+      // Generate a clean 440 Hz sine as 16-bit samples
+      final samples = List<int>.generate(
+        sampleRate,
+        (i) => (0.3 * math.sin(2 * math.pi * 440 * i / sampleRate) * 32767)
+            .round(),
+      );
+
+      final bytes = buildRawPcm16Mono(samples);
+      final format = PcmFormat(
+        sampleRate: sampleRate,
+        bitDepth: 16,
+        channels: 1,
+      );
+
+      final result = await analysePcm(bytes, format: format);
+      expect(result.defects, isEmpty);
+    });
+
+    test('propagates config sensitivity', () async {
+      const sampleRate = 44100;
+      // 1 second of sine with a weak spike
+      final samples = List<int>.generate(
+        sampleRate,
+        (i) => (0.1 * math.sin(2 * math.pi * 440 * i / sampleRate) * 32767)
+            .round(),
+      );
+      // Inject a moderate spike
+      samples[22050] = (0.3 * 32767).round();
+      samples[22051] = (-0.3 * 32767).round();
+
+      final bytes = buildRawPcm16Mono(samples);
+      final format = PcmFormat(
+        sampleRate: sampleRate,
+        bitDepth: 16,
+        channels: 1,
+      );
+
+      final resultHigh = await analysePcm(
+        bytes,
+        format: format,
+        config: const DetectorConfig(sensitivity: Sensitivity.high),
+      );
+      final resultLow = await analysePcm(
+        bytes,
+        format: format,
+        config: const DetectorConfig(sensitivity: Sensitivity.low),
+      );
+
+      // High sensitivity should find at least as many defects as low
+      expect(resultHigh.defects.length,
+          greaterThanOrEqualTo(resultLow.defects.length));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // analyseSamples()
+  // -------------------------------------------------------------------------
+
+  group('analyseSamples()', () {
+    test('detects defects in pre-normalised samples', () async {
+      const sampleRate = 44100;
+      final channel = Float32List(sampleRate);
+      // Inject a sharp spike
+      channel[22050] = 0.98;
+      channel[22051] = -0.98;
+
+      final result = await analyseSamples(
+        [channel],
+        sampleRate: sampleRate,
+        config: const DetectorConfig(sensitivity: Sensitivity.high),
+      );
+
+      expect(result.defects, isNotEmpty);
+    });
+
+    test('returns no defects for silence', () async {
+      const sampleRate = 44100;
+      final channel = Float32List(sampleRate); // all zeros
+
+      final result = await analyseSamples(
+        [channel],
+        sampleRate: sampleRate,
+      );
+
+      expect(result.defects, isEmpty);
+      expect(result.aggregateConfidence, equals(0.0));
+    });
+
+    test('empty channels returns no defects', () async {
+      final result = await analyseSamples(
+        [Float32List(0)],
+        sampleRate: 44100,
+      );
+
+      expect(result.defects, isEmpty);
+      expect(result.metadata.channels, equals(1));
+      expect(result.metadata.duration, equals(Duration.zero));
     });
   });
 }

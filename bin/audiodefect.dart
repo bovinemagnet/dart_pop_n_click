@@ -14,6 +14,7 @@ library;
 import 'dart:convert';
 import 'dart:io';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:args/args.dart';
 import 'package:audio_defect_detector/audio_defect_detector.dart';
@@ -68,7 +69,24 @@ Future<void> main(List<String> args) async {
           defaultsTo: 'text',
         )
         ..addFlag('quiet', abbr: 'q', help: 'Suppress all output.', negatable: false)
-        ..addFlag('verbose', abbr: 'v', help: 'Show extra diagnostics.', negatable: false),
+        ..addFlag('verbose', abbr: 'v', help: 'Show extra diagnostics.', negatable: false)
+        ..addFlag('raw', help: 'Treat input as raw PCM (no header).', negatable: false)
+        ..addOption(
+          'sample-rate',
+          help: 'Sample rate for raw PCM.',
+          defaultsTo: '44100',
+        )
+        ..addOption(
+          'bit-depth',
+          help: 'Bit depth for raw PCM (8, 16, 24, 32).',
+          defaultsTo: '16',
+        )
+        ..addOption(
+          'channels',
+          help: 'Number of channels for raw PCM.',
+          defaultsTo: '2',
+        )
+        ..addFlag('float', help: 'Treat raw PCM as IEEE float instead of integer.', negatable: false),
     )
     ..addFlag('help', abbr: 'h', help: 'Show this help.', negatable: false)
     ..addFlag('version', help: 'Print the version and exit.', negatable: false);
@@ -120,6 +138,34 @@ Future<void> _runAnalyse(ArgResults cmd) async {
   final sensitivityStr = cmd['sensitivity'] as String;
   final minConfidence = _parseDouble(cmd['min-confidence'] as String, 'min-confidence');
   final threshold = _parseDouble(cmd['threshold'] as String, 'threshold');
+  final isRaw = cmd['raw'] as bool;
+  final isFloat = cmd['float'] as bool;
+
+  // Build PcmFormat when --raw is specified.
+  PcmFormat? pcmFormat;
+  if (isRaw) {
+    final sampleRate = int.tryParse(cmd['sample-rate'] as String);
+    final bitDepth = int.tryParse(cmd['bit-depth'] as String);
+    final channels = int.tryParse(cmd['channels'] as String);
+    if (sampleRate == null || sampleRate <= 0) {
+      stderr.writeln('Error: --sample-rate must be a positive integer.');
+      exit(_exitUsageError);
+    }
+    if (bitDepth == null || ![8, 16, 24, 32].contains(bitDepth)) {
+      stderr.writeln('Error: --bit-depth must be one of 8, 16, 24, 32.');
+      exit(_exitUsageError);
+    }
+    if (channels == null || channels <= 0) {
+      stderr.writeln('Error: --channels must be a positive integer.');
+      exit(_exitUsageError);
+    }
+    pcmFormat = PcmFormat(
+      sampleRate: sampleRate,
+      bitDepth: bitDepth,
+      channels: channels,
+      isFloat: isFloat,
+    );
+  }
 
   final sensitivity = switch (sensitivityStr) {
     'low' => Sensitivity.low,
@@ -145,7 +191,12 @@ Future<void> _runAnalyse(ArgResults cmd) async {
     AnalysisResult result;
     try {
       if (!quiet && verbose) stderr.writeln('Analysing $path …');
-      result = await analyseFile(path, config: config);
+      if (isRaw) {
+        final bytes = Uint8List.fromList(await File(path).readAsBytes());
+        result = await analysePcm(bytes, format: pcmFormat!, config: config);
+      } else {
+        result = await analyseFile(path, config: config);
+      }
     } on IoException catch (e) {
       if (!quiet) stderr.writeln('Error: $e');
       exit(_exitFileError);
@@ -181,7 +232,12 @@ Future<void> _runAnalyse(ArgResults cmd) async {
     String? errorMsg;
     try {
       if (!quiet && verbose) stderr.writeln('Analysing $path …');
-      result = await analyseFile(path, config: config);
+      if (isRaw) {
+        final bytes = Uint8List.fromList(await File(path).readAsBytes());
+        result = await analysePcm(bytes, format: pcmFormat!, config: config);
+      } else {
+        result = await analyseFile(path, config: config);
+      }
     } on IoException catch (e) {
       errorMsg = '$e';
     } on UnsupportedFormatException catch (e) {
@@ -341,6 +397,10 @@ void _usage(ArgParser parser, [String? error]) {
     ..writeln()
     ..writeln('Usage:')
     ..writeln('  audiodefect analyse <file|glob> [options]')
+    ..writeln()
+    ..writeln('Examples:')
+    ..writeln('  audiodefect analyse recording.wav')
+    ..writeln('  audiodefect analyse recording.raw --raw --sample-rate=48000 --bit-depth=24 --channels=1')
     ..writeln()
     ..writeln('Options:')
     ..writeln(parser.usage);

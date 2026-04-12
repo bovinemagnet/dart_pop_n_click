@@ -3,6 +3,7 @@ library;
 
 import 'dart:typed_data';
 import 'models.dart';
+import 'pcm_decoder.dart';
 
 // ---------------------------------------------------------------------------
 // Public entry point
@@ -34,7 +35,6 @@ WavData decodeWav(Uint8List bytes) {
   int bitDepth = 0;
   int channels = 0;
   int audioFormat = 0;
-  int blockAlign = 0;
   Uint8List? pcmData;
 
   while (reader.remaining >= 8) {
@@ -56,7 +56,7 @@ WavData decodeWav(Uint8List bytes) {
         channels = reader.readUint16Le();
         sampleRate = reader.readUint32Le();
         reader.skip(4); // byte rate
-        blockAlign = reader.readUint16Le();
+        reader.skip(2); // block align
         bitDepth = reader.readUint16Le();
         // Skip any extension bytes
         if (chunkSize > 16) reader.skip(chunkSize - 16);
@@ -87,21 +87,16 @@ WavData decodeWav(Uint8List bytes) {
   }
 
   // ---- Decode samples -------------------------------------------------------
-  if (pcmData.length % blockAlign != 0) {
-    throw CorruptFileException(
-      'PCM data length not aligned to block size.',
-    );
-  }
-  final totalFrames = pcmData.length ~/ blockAlign;
-  final List<Float32List> channelSamples =
-      List.generate(channels, (_) => Float32List(totalFrames));
+  final pcmFormat = PcmFormat(
+    sampleRate: sampleRate,
+    bitDepth: bitDepth,
+    channels: channels,
+    isFloat: audioFormat == 3,
+  );
+  final channelSamples = decodePcmBytes(pcmData, pcmFormat);
 
-  if (audioFormat == 3 && bitDepth == 32) {
-    _decodeFloat32(pcmData, channels, totalFrames, channelSamples);
-  } else {
-    _decodePcm(pcmData, channels, bitDepth, totalFrames, channelSamples);
-  }
-
+  final totalFrames =
+      channelSamples.isEmpty ? 0 : channelSamples[0].length;
   final durationMs = (totalFrames / sampleRate * 1000).round();
 
   final metadata = AudioMetadata(
@@ -125,70 +120,6 @@ class WavData {
   final List<Float32List> samples;
 
   const WavData({required this.metadata, required this.samples});
-}
-
-// ---------------------------------------------------------------------------
-// PCM decoders
-// ---------------------------------------------------------------------------
-
-void _decodePcm(
-  Uint8List data,
-  int channels,
-  int bitDepth,
-  int totalFrames,
-  List<Float32List> out,
-) {
-  final bytesPerSample = bitDepth ~/ 8;
-  final byteData = ByteData.sublistView(data);
-  int byteOffset = 0;
-
-  for (int frame = 0; frame < totalFrames; frame++) {
-    for (int ch = 0; ch < channels; ch++) {
-      final double normalized;
-      switch (bitDepth) {
-        case 8:
-          // 8-bit PCM is unsigned
-          final v = byteData.getUint8(byteOffset);
-          normalized = (v - 128) / 128.0;
-        case 16:
-          final v = byteData.getInt16(byteOffset, Endian.little);
-          normalized = v / 32768.0;
-        case 24:
-          // 3-byte little-endian signed
-          final b0 = byteData.getUint8(byteOffset);
-          final b1 = byteData.getUint8(byteOffset + 1);
-          final b2 = byteData.getUint8(byteOffset + 2);
-          int raw = b0 | (b1 << 8) | (b2 << 16);
-          if (raw & 0x800000 != 0) raw = raw - 0x1000000; // sign extend
-          normalized = raw / 8388608.0;
-        case 32:
-          final v = byteData.getInt32(byteOffset, Endian.little);
-          normalized = v / 2147483648.0;
-        default:
-          throw UnsupportedFormatException(
-              'Unsupported PCM bit depth: $bitDepth');
-      }
-      out[ch][frame] = normalized.clamp(-1.0, 1.0);
-      byteOffset += bytesPerSample;
-    }
-  }
-}
-
-void _decodeFloat32(
-  Uint8List data,
-  int channels,
-  int totalFrames,
-  List<Float32List> out,
-) {
-  final byteData = ByteData.sublistView(data);
-  int byteOffset = 0;
-  for (int frame = 0; frame < totalFrames; frame++) {
-    for (int ch = 0; ch < channels; ch++) {
-      out[ch][frame] =
-          byteData.getFloat32(byteOffset, Endian.little).clamp(-1.0, 1.0);
-      byteOffset += 4;
-    }
-  }
 }
 
 // ---------------------------------------------------------------------------
