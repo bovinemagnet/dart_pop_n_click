@@ -301,4 +301,133 @@ void main() {
       expect(result.metadata.duration, equals(Duration.zero));
     });
   });
+
+  // -------------------------------------------------------------------------
+  // Format detection edge cases
+  // -------------------------------------------------------------------------
+
+  group('analyseBytes() – format detection', () {
+    test(
+        'file with .wav extension but invalid magic bytes throws UnsupportedFormatException or CorruptFileException',
+        () {
+      final bytes = Uint8List.fromList([
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
+        0x0B, 0x0C,
+      ]);
+      expect(
+        () => analyseBytes(bytes, path: 'test.wav'),
+        throwsA(anyOf(
+            isA<UnsupportedFormatException>(), isA<CorruptFileException>())),
+      );
+    });
+
+    test(
+        'file with unknown extension and no valid magic bytes throws UnsupportedFormatException',
+        () {
+      final bytes = Uint8List.fromList([
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
+        0x0B, 0x0C,
+      ]);
+      expect(
+        () => analyseBytes(bytes, path: 'test.xyz'),
+        throwsA(isA<UnsupportedFormatException>()),
+      );
+    });
+
+    test('no path and no valid magic bytes throws UnsupportedFormatException',
+        () {
+      final bytes = Uint8List.fromList([
+        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
+        0x0B, 0x0C,
+      ]);
+      expect(
+        () => analyseBytes(bytes),
+        throwsA(isA<UnsupportedFormatException>()),
+      );
+    });
+
+    test(
+        'bytes shorter than 12 with no path throws UnsupportedFormatException',
+        () {
+      final bytes =
+          Uint8List.fromList([0x52, 0x49, 0x46, 0x46]); // Just "RIFF"
+      expect(
+        () => analyseBytes(bytes),
+        throwsA(isA<UnsupportedFormatException>()),
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // analysePcm() – validation
+  // -------------------------------------------------------------------------
+
+  group('analysePcm() – validation', () {
+    test('misaligned bytes throws CorruptFileException', () {
+      // 16-bit stereo needs 4 bytes per frame; 5 bytes is misaligned
+      final format =
+          PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 2);
+      final bytes = Uint8List(5);
+      expect(
+        () => analysePcm(bytes, format: format),
+        throwsA(isA<CorruptFileException>()),
+      );
+    });
+
+    test('empty bytes returns no defects', () async {
+      final format =
+          PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 1);
+      final bytes = Uint8List(0);
+      final result = await analysePcm(bytes, format: format);
+      expect(result.defects, isEmpty);
+      expect(result.aggregateConfidence, equals(0.0));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // analyseSamples() – edge cases
+  // -------------------------------------------------------------------------
+
+  group('analyseSamples() – edge cases', () {
+    test('single-sample channels returns no defects', () async {
+      final samples = [Float32List.fromList([0.5])];
+      final result = await analyseSamples(samples, sampleRate: 44100);
+      expect(result.defects, isEmpty);
+    });
+
+    test('metadata reflects correct values', () async {
+      final samples = [
+        Float32List(44100),
+        Float32List(44100),
+      ]; // 1 second stereo
+      final result = await analyseSamples(samples,
+          sampleRate: 44100, bitDepth: 24);
+      expect(result.metadata.sampleRate, equals(44100));
+      expect(result.metadata.bitDepth, equals(24));
+      expect(result.metadata.channels, equals(2));
+      expect(result.metadata.duration.inMilliseconds, closeTo(1000, 1));
+    });
+
+    test('config sensitivity propagates to analyseSamples', () async {
+      // Create signal with a weak click
+      final n = 44100;
+      final samples = Float32List(n);
+      samples[22050] = 0.3; // weak
+      samples[22051] = -0.3;
+
+      final highResult = await analyseSamples(
+        [samples],
+        sampleRate: 44100,
+        config: DetectorConfig(sensitivity: Sensitivity.high),
+      );
+      final lowResult = await analyseSamples(
+        [samples],
+        sampleRate: 44100,
+        config: DetectorConfig(sensitivity: Sensitivity.low),
+      );
+      // High sensitivity should find more or equal defects than low
+      expect(highResult.defects.length,
+          greaterThanOrEqualTo(lowResult.defects.length));
+    });
+  });
 }

@@ -291,6 +291,98 @@ void main() {
     });
   });
 
+  group('detectDefects – edge cases', () {
+    test('single-sample buffer returns empty list', () {
+      final samples = [Float32List.fromList([0.5])];
+      final config = DetectorConfig();
+      final defects = detectDefects(samples, 44100, config);
+      expect(defects, isEmpty);
+    });
+
+    test('two-sample buffer does not crash', () {
+      final samples = [Float32List.fromList([0.0, 1.0])];
+      final config = DetectorConfig();
+      final defects = detectDefects(samples, 44100, config);
+      // May or may not detect defect, but should not crash
+      expect(defects, isA<List<Defect>>());
+    });
+
+    test('empty channel list returns empty', () {
+      final samples = [Float32List(0)];
+      final config = DetectorConfig();
+      final defects = detectDefects(samples, 44100, config);
+      expect(defects, isEmpty);
+    });
+  });
+
+  group('detectDefects – channel validation', () {
+    test('mismatched channel lengths throws StateError', () {
+      // Channel 0 has 1000 samples, channel 1 has 500
+      final ch0 = Float32List(1000);
+      final ch1 = Float32List(500);
+      final config = DetectorConfig(); // perChannel defaults to false, so _sumToMono is called
+      expect(
+        () => detectDefects([ch0, ch1], sampleRate, config),
+        throwsA(isA<StateError>()),
+      );
+    });
+  });
+
+  group('detectDefects – perChannel with mono', () {
+    test('perChannel true with single channel still detects defects', () {
+      // Create a mono signal with a click
+      final n = sampleRate;
+      final samples = Float32List(n); // silence
+      // Inject a click at sample 22050
+      samples[22050] = 0.99;
+      samples[22051] = -0.99;
+
+      final config = DetectorConfig(
+        sensitivity: Sensitivity.high,
+        perChannel: true,
+      );
+      final defects = detectDefects([samples], sampleRate, config);
+      expect(defects, isNotEmpty);
+      expect(defects.first.channel, equals(0));
+    });
+  });
+
+  group('detectDefects – configuration edge cases', () {
+    test('minConfidence of 1.0 filters sub-1.0 defects', () {
+      final n = sampleRate;
+      final samples = Float32List(n);
+      samples[22050] = 0.99;
+      samples[22051] = -0.99;
+
+      final config = DetectorConfig(
+        sensitivity: Sensitivity.high,
+        minConfidence: 1.0,
+      );
+      final defects = detectDefects([samples], sampleRate, config);
+      // All returned defects must have confidence >= 1.0
+      for (final d in defects) {
+        expect(d.confidence, greaterThanOrEqualTo(1.0));
+      }
+    });
+
+    test('maxDefects of 1 returns only the first defect', () {
+      final n = sampleRate;
+      final samples = Float32List(n);
+      // Inject two clicks far apart
+      samples[10000] = 0.99;
+      samples[10001] = -0.99;
+      samples[30000] = 0.99;
+      samples[30001] = -0.99;
+
+      final config = DetectorConfig(
+        sensitivity: Sensitivity.high,
+        maxDefects: 1,
+      );
+      final defects = detectDefects([samples], sampleRate, config);
+      expect(defects.length, equals(1));
+    });
+  });
+
   group('Defect model', () {
     test('toJson contains all required fields', () {
       final d = _fakeDefect(0.75);
