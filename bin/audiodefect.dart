@@ -2,7 +2,7 @@
 /// `audiodefect` — Command-line interface for the audio_defect_detector library.
 ///
 /// Usage:
-///   audiodefect analyse <file|glob> [options]
+///   audiodefect analyse `<file|glob>` [options]
 ///
 /// Exit codes:
 ///   0 — clean file (no defects above threshold)
