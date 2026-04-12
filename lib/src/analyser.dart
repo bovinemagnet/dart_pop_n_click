@@ -31,6 +31,12 @@ Future<AnalysisResult> analyseFile(
   } catch (e) {
     throw IoException('Cannot read file "$path"', e);
   }
+
+  // Guard against excessively large files (>2 GB).
+  if (bytes.length > 2 * 1024 * 1024 * 1024) {
+    throw UnsupportedFormatException('File too large (max 2 GB).');
+  }
+
   return analyseBytes(bytes, path: path, config: config);
 }
 

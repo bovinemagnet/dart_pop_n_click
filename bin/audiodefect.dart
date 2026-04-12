@@ -82,6 +82,7 @@ Future<void> main(List<String> args) async {
   }
 
   if (topLevel['version'] as bool) {
+    // TODO: Keep in sync with version in pubspec.yaml.
     stdout.writeln('audiodefect 0.1.0');
     exit(_exitClean);
   }
@@ -146,13 +147,13 @@ Future<void> _runAnalyse(ArgResults cmd) async {
       if (!quiet && verbose) stderr.writeln('Analysing $path …');
       result = await analyseFile(path, config: config);
     } on IoException catch (e) {
-      stderr.writeln('Error: $e');
+      if (!quiet) stderr.writeln('Error: $e');
       exit(_exitFileError);
     } on UnsupportedFormatException catch (e) {
-      stderr.writeln('Error: $e');
+      if (!quiet) stderr.writeln('Error: $e');
       exit(_exitFileError);
     } on CorruptFileException catch (e) {
-      stderr.writeln('Error: $e');
+      if (!quiet) stderr.writeln('Error: $e');
       exit(_exitFileError);
     }
 
@@ -173,7 +174,7 @@ Future<void> _runAnalyse(ArgResults cmd) async {
   // ---- Batch mode ---------------------------------------------------------
   final List<Map<String, dynamic>> batchJson = [];
   int totalDefects = 0;
-  bool anyAboveThreshold = false;
+  int worstExitCode = _exitClean;
 
   for (final path in filePaths) {
     AnalysisResult? result;
@@ -192,7 +193,9 @@ Future<void> _runAnalyse(ArgResults cmd) async {
     if (result != null) {
       totalDefects += result.defects.length;
       final above = result.defects.where((d) => d.confidence >= threshold);
-      if (above.isNotEmpty) anyAboveThreshold = true;
+      if (above.isNotEmpty && worstExitCode < _exitDefectsFound) {
+        worstExitCode = _exitDefectsFound;
+      }
 
       if (!quiet) {
         if (outputFormat == 'json') {
@@ -202,6 +205,9 @@ Future<void> _runAnalyse(ArgResults cmd) async {
         }
       }
     } else {
+      if (worstExitCode < _exitFileError) {
+        worstExitCode = _exitFileError;
+      }
       if (!quiet) {
         if (outputFormat == 'json') {
           batchJson.add({'file': path, 'error': errorMsg});
@@ -220,7 +226,7 @@ Future<void> _runAnalyse(ArgResults cmd) async {
         '\nSummary: ${filePaths.length} file(s), $totalDefects total defect(s).');
   }
 
-  exit(anyAboveThreshold ? _exitDefectsFound : _exitClean);
+  exit(worstExitCode);
 }
 
 // ---------------------------------------------------------------------------

@@ -19,6 +19,25 @@ import 'dart:typed_data';
 import 'models.dart';
 
 // ---------------------------------------------------------------------------
+// Named constants
+// ---------------------------------------------------------------------------
+
+/// Normal distribution consistency constant (MAD → sigma).
+const double _kMadScaleFactor = 1.4826;
+
+/// Minimum threshold to avoid division by zero in near-silence.
+const double _kThresholdFloor = 1e-6;
+
+/// Centre of the logistic (sigmoid) confidence curve.
+const double _kLogisticCentre = 10.0;
+
+/// Scale of the logistic (sigmoid) confidence curve.
+const double _kLogisticScale = 3.0;
+
+/// Maximum gap (in samples) between flagged samples to merge regions.
+const int _kMergeGap = 4;
+
+// ---------------------------------------------------------------------------
 // Public entry point
 // ---------------------------------------------------------------------------
 
@@ -170,10 +189,10 @@ Float32List _buildAdaptiveThreshold(
       window[j - start] = diff[j].abs();
     }
     final mad = _mad(window);
-    // MAD → sigma: multiply by 1.4826 (consistency factor for normal dist.)
-    threshold[i] = mad * 1.4826 * multiplier;
-    // Enforce a minimum floor to avoid spurious detections in digital silence
-    if (threshold[i] < 1e-6) threshold[i] = 1e-6;
+    // MAD → sigma: multiply by consistency factor for normal distribution.
+    threshold[i] = mad * _kMadScaleFactor * multiplier;
+    // Enforce a minimum floor to avoid spurious detections in digital silence.
+    if (threshold[i] < _kThresholdFloor) threshold[i] = _kThresholdFloor;
   }
   return threshold;
 }
@@ -204,7 +223,7 @@ double _median(Float32List sorted) {
 
 /// Merge consecutive flagged samples into (start, end) inclusive tuples.
 /// Adjacent flagged regions separated by ≤ `gap` samples are merged.
-List<(int, int)> _mergeRegions(List<bool> flagged, {int gap = 4}) {
+List<(int, int)> _mergeRegions(List<bool> flagged, {int gap = _kMergeGap}) {
   final List<(int, int)> regions = [];
   int? start;
   int? last;
@@ -236,8 +255,8 @@ List<(int, int)> _mergeRegions(List<bool> flagged, {int gap = 4}) {
 double _logisticConfidence(double peakDiff, double localNoise) {
   if (localNoise <= 0) return 1.0;
   final ratio = peakDiff / localNoise;
-  // Sigmoid centred at ratio = 10, scaled so ratio ≈ 20 → 0.99
-  final score = 1.0 / (1.0 + math.exp(-(ratio - 10.0) / 3.0));
+  // Sigmoid centred at ratio = _kLogisticCentre, scaled so ratio ≈ 20 → 0.99
+  final score = 1.0 / (1.0 + math.exp(-(ratio - _kLogisticCentre) / _kLogisticScale));
   return score.clamp(0.0, 1.0);
 }
 
@@ -264,6 +283,14 @@ double computeAggregateConfidence(List<Defect> defects) {
 Float32List _sumToMono(List<Float32List> channels) {
   if (channels.length == 1) return channels[0];
   final n = channels[0].length;
+  for (int c = 1; c < channels.length; c++) {
+    if (channels[c].length != n) {
+      throw StateError(
+        'Channel length mismatch: channel 0 has $n samples but '
+        'channel $c has ${channels[c].length} samples.',
+      );
+    }
+  }
   final mono = Float32List(n);
   final scale = 1.0 / channels.length;
   for (final ch in channels) {

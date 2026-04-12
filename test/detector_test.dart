@@ -196,6 +196,101 @@ void main() {
     });
   });
 
+  group('detectDefects – per-channel analysis', () {
+    test('click on channel 0 only is attributed to channel 0', () {
+      // 2-channel signal: channel 0 has a click, channel 1 is silent
+      final ch0 = sineWave(sampleRate);
+      injectClick(ch0, 10000, amplitude: 0.99);
+      final ch1 = sineWave(sampleRate);
+
+      final defects = detectDefects(
+        [ch0, ch1],
+        sampleRate,
+        DetectorConfig(sensitivity: Sensitivity.high, perChannel: true),
+      );
+
+      // Should find defect(s) attributed to channel 0
+      final ch0Defects = defects.where((d) => d.channel == 0);
+      expect(ch0Defects, isNotEmpty);
+      final nearClick = ch0Defects.where(
+        (d) => (d.sampleIndex - 10000).abs() < 50,
+      );
+      expect(nearClick, isNotEmpty);
+    });
+  });
+
+  group('detectDefects – stereo summed to mono', () {
+    test('detects click on one channel when summed to mono', () {
+      final ch0 = sineWave(sampleRate);
+      injectClick(ch0, 10000, amplitude: 0.99);
+      final ch1 = sineWave(sampleRate);
+
+      // Default config: perChannel = false (sum to mono)
+      final defects = detectDefects(
+        [ch0, ch1],
+        sampleRate,
+        DetectorConfig(sensitivity: Sensitivity.high),
+      );
+
+      expect(defects, isNotEmpty);
+      final nearClick = defects.where(
+        (d) => (d.sampleIndex - 10000).abs() < 50,
+      );
+      expect(nearClick, isNotEmpty);
+    });
+  });
+
+  group('detectDefects – region merging boundary', () {
+    test('two clicks separated by 4 samples merge into one defect', () {
+      // Build a signal with two flagged regions exactly 4 samples apart
+      final buf = silence(sampleRate);
+      // First click
+      buf[10000] = 0.99;
+      buf[10001] = -0.99;
+      // Second click 4 samples after the end of the first
+      // First region ends at ~10001, second starts at 10001 + 4 + 1 = 10006
+      // Gap of 4 → should merge (gap <= 4)
+      buf[10006] = 0.99;
+      buf[10007] = -0.99;
+
+      final defects = detectDefects(
+        [buf],
+        sampleRate,
+        DetectorConfig(sensitivity: Sensitivity.high),
+      );
+
+      // Find defects near this region
+      final nearRegion = defects.where(
+        (d) => d.sampleIndex >= 9950 && d.sampleIndex <= 10050,
+      );
+      // Merged: should be at most 1 defect covering the whole region
+      expect(nearRegion.length, equals(1));
+    });
+
+    test('two clicks separated by 5+ samples remain separate defects', () {
+      final buf = silence(sampleRate);
+      // First click
+      buf[10000] = 0.99;
+      buf[10001] = -0.99;
+      // Second click with gap > 4 (5 samples gap)
+      buf[10007] = 0.99;
+      buf[10008] = -0.99;
+
+      final defects = detectDefects(
+        [buf],
+        sampleRate,
+        DetectorConfig(sensitivity: Sensitivity.high),
+      );
+
+      // Find defects near this region
+      final nearRegion = defects.where(
+        (d) => d.sampleIndex >= 9950 && d.sampleIndex <= 10050,
+      );
+      // Should be 2 separate defects
+      expect(nearRegion.length, equals(2));
+    });
+  });
+
   group('Defect model', () {
     test('toJson contains all required fields', () {
       final d = _fakeDefect(0.75);

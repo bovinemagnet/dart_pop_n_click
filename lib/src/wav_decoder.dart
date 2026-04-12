@@ -41,6 +41,12 @@ WavData decodeWav(Uint8List bytes) {
     final chunkId = reader.readFourCC();
     final chunkSize = reader.readUint32Le();
 
+    if (chunkSize > reader.remaining) {
+      throw CorruptFileException(
+        'Chunk claims $chunkSize bytes but only ${reader.remaining} remain.',
+      );
+    }
+
     switch (chunkId) {
       case 'fmt ':
         if (chunkSize < 16) {
@@ -81,6 +87,11 @@ WavData decodeWav(Uint8List bytes) {
   }
 
   // ---- Decode samples -------------------------------------------------------
+  if (pcmData.length % blockAlign != 0) {
+    throw CorruptFileException(
+      'PCM data length not aligned to block size.',
+    );
+  }
   final totalFrames = pcmData.length ~/ blockAlign;
   final List<Float32List> channelSamples =
       List.generate(channels, (_) => Float32List(totalFrames));

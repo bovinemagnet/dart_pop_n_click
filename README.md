@@ -1,6 +1,22 @@
 # dart_pop_n_click
 
-Pure Dart library to detect pop and clicks in a wav file or flac file.
+Pure Dart library to detect pops and clicks in WAV audio files.
+
+## Features
+
+- Detect clicks (1–10 samples) and pops (10–150 samples) in WAV audio
+- Adaptive MAD-based threshold with configurable sensitivity
+- Support for PCM 8/16/24/32-bit and IEEE Float 32-bit WAV files
+- Per-channel or mono-summed analysis
+- Confidence scoring with logistic function
+- CLI tool with text and JSON output, glob support, and batch processing
+- Pure Dart — no native dependencies, works on all platforms
+
+## Installation
+
+```sh
+dart pub add audio_defect_detector
+```
 
 ## Package: `audio_defect_detector`
 
@@ -158,4 +174,12 @@ $ audiodefect analyse recording.wav --output=json
 dart pub get
 dart test
 ```
+
+---
+
+## Limitations
+
+- Maximum file size: 2 GB (files are loaded entirely into memory)
+- Only WAV format is currently supported (FLAC planned for future release)
+- Glob support in CLI is limited to simple `prefix*suffix` patterns
 
