@@ -12,6 +12,7 @@ Pure Dart library to detect pops and clicks in WAV audio files.
 - Per-channel or mono-summed analysis
 - Confidence scoring with logistic function
 - CLI tool with text and JSON output, glob support, and batch processing
+- Public `median()` and `mad()` statistical utilities for custom signal analysis
 - Pure Dart — no native dependencies, works on all platforms
 
 ## Installation
@@ -46,6 +47,15 @@ void main() async {
   }
 }
 ```
+
+### Public API Summary
+
+| Module | Exports |
+|---|---|
+| `analyser.dart` | `analyseFile()`, `analyseBytes()`, `analysePcm()`, `analyseSamples()` |
+| `models.dart` | `DetectorConfig`, `Sensitivity`, `Defect`, `DefectType`, `AudioMetadata`, `AnalysisResult`, `PcmFormat`, `UnsupportedFormatException`, `CorruptFileException`, `IoException` |
+| `pcm_decoder.dart` | `decodePcmBytes()` |
+| `math_utils.dart` | `median()`, `mad()` |
 
 ### `analyseFile(path, {config})`
 Reads the file at `path` and returns a `Future<AnalysisResult>`.
@@ -108,6 +118,25 @@ final result = await analyseSamples(
   samples,
   sampleRate: 44100,
 );
+```
+
+---
+
+## Statistical Utilities
+
+The library exposes two robust statistical functions from `math_utils.dart` for custom signal analysis:
+
+### `median(Float32List sorted)`
+Compute the median of a sorted `Float32List`.
+
+### `mad(Float32List values)`
+Median Absolute Deviation — a robust dispersion measure that is resistant to outliers.
+
+```dart
+import 'package:audio_defect_detector/audio_defect_detector.dart';
+
+final values = Float32List.fromList([1.0, 2.0, 3.0, 4.0, 100.0]);
+final dispersion = mad(values); // 1.0 — robust to the outlier
 ```
 
 ---

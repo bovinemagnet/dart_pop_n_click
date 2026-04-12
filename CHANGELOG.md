@@ -6,3 +6,10 @@
 - CLI tool `audiodefect` with text and JSON output
 - Configurable sensitivity (low/medium/high)
 - Per-channel or mono-summed analysis
+- Raw PCM byte analysis via `analysePcm()` with `PcmFormat` descriptor
+- Pre-normalised sample analysis via `analyseSamples()`
+- Public `median()` and `mad()` statistical utilities
+- `decodePcmBytes()` for manual PCM-to-float conversion
+- CLI `--raw` mode with `--sample-rate`, `--bit-depth`, `--channels`, `--float` options
+- Comprehensive test suite (153 tests)
+- Security hardening: file size limits, WAV chunk validation, block alignment checks
