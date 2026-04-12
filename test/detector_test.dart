@@ -383,6 +383,31 @@ void main() {
     });
   });
 
+  group('detectDefects – sample rate edge cases', () {
+    test('very low sample rate (8000 Hz) still detects clicks', () {
+      final n = 8000; // 1 second at 8kHz
+      final samples = Float32List(n);
+      // Inject a click
+      samples[4000] = 0.99;
+      samples[4001] = -0.99;
+
+      final config = DetectorConfig(sensitivity: Sensitivity.high);
+      final defects = detectDefects([samples], 8000, config);
+      expect(defects, isNotEmpty);
+    });
+
+    test('high sample rate (192000 Hz) still detects clicks', () {
+      final n = 192000; // 1 second at 192kHz
+      final samples = Float32List(n);
+      samples[96000] = 0.99;
+      samples[96001] = -0.99;
+
+      final config = DetectorConfig(sensitivity: Sensitivity.high);
+      final defects = detectDefects([samples], 192000, config);
+      expect(defects, isNotEmpty);
+    });
+  });
+
   group('Defect model', () {
     test('toJson contains all required fields', () {
       final d = _fakeDefect(0.75);

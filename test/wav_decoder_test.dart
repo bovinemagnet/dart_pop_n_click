@@ -499,6 +499,128 @@ void main() {
     });
   });
 
+  group('WAV decoder – fmt chunk extensions', () {
+    test('fmt chunk larger than 16 bytes is parsed correctly', () {
+      // Build a WAV where the fmt chunk has extra extension bytes (size=20)
+      // The decoder should skip the extra bytes and still parse correctly
+      final sampleRate = 44100;
+      final numSamples = 10;
+      final dataSize = numSamples * 2;
+      final fmtChunkSize = 20; // 16 standard + 4 extension bytes
+      final fileSize =
+          12 + 8 + fmtChunkSize + 8 + dataSize; // RIFF + fmt header + fmt data + data header + data
+
+      final bd = ByteData(fileSize);
+      var offset = 0;
+      // RIFF header
+      for (final c in 'RIFF'.codeUnits) { bd.setUint8(offset++, c); }
+      bd.setUint32(offset, fileSize - 8, Endian.little);
+      offset += 4;
+      for (final c in 'WAVE'.codeUnits) { bd.setUint8(offset++, c); }
+      // fmt chunk
+      for (final c in 'fmt '.codeUnits) { bd.setUint8(offset++, c); }
+      bd.setUint32(offset, fmtChunkSize, Endian.little);
+      offset += 4;
+      bd.setUint16(offset, 1, Endian.little);
+      offset += 2; // PCM
+      bd.setUint16(offset, 1, Endian.little);
+      offset += 2; // mono
+      bd.setUint32(offset, sampleRate, Endian.little);
+      offset += 4;
+      bd.setUint32(offset, sampleRate * 2, Endian.little);
+      offset += 4; // byte rate
+      bd.setUint16(offset, 2, Endian.little);
+      offset += 2; // block align
+      bd.setUint16(offset, 16, Endian.little);
+      offset += 2; // bits per sample
+      // 4 extension bytes (should be skipped)
+      bd.setUint16(offset, 0, Endian.little);
+      offset += 2; // cbSize = 0
+      bd.setUint16(offset, 0, Endian.little);
+      offset += 2; // padding
+      // data chunk
+      for (final c in 'data'.codeUnits) { bd.setUint8(offset++, c); }
+      bd.setUint32(offset, dataSize, Endian.little);
+      offset += 4;
+      // Write some samples
+      for (var i = 0; i < numSamples; i++) {
+        bd.setInt16(offset, i * 1000, Endian.little);
+        offset += 2;
+      }
+
+      final result = decodeWav(bd.buffer.asUint8List());
+      expect(result.metadata.sampleRate, equals(sampleRate));
+      expect(result.metadata.channels, equals(1));
+      expect(result.samples[0].length, equals(numSamples));
+    });
+  });
+
+  group('WAV decoder – multiple odd-sized chunks', () {
+    test('multiple consecutive odd-sized unknown chunks are skipped', () {
+      // Build WAV with two odd-sized unknown chunks before data
+      final sampleRate = 44100;
+      final numSamples = 4;
+      final dataSize = numSamples * 2;
+      // chunk1: "TST1" size=5 + 5 bytes + 1 pad = 14 bytes total
+      // chunk2: "TST2" size=3 + 3 bytes + 1 pad = 12 bytes total
+      final fileSize = 12 + 8 + 16 + 14 + 12 + 8 + dataSize;
+
+      final bd = ByteData(fileSize);
+      var offset = 0;
+      // RIFF header
+      for (final c in 'RIFF'.codeUnits) { bd.setUint8(offset++, c); }
+      bd.setUint32(offset, fileSize - 8, Endian.little);
+      offset += 4;
+      for (final c in 'WAVE'.codeUnits) { bd.setUint8(offset++, c); }
+      // fmt chunk (16 bytes)
+      for (final c in 'fmt '.codeUnits) { bd.setUint8(offset++, c); }
+      bd.setUint32(offset, 16, Endian.little);
+      offset += 4;
+      bd.setUint16(offset, 1, Endian.little);
+      offset += 2; // PCM
+      bd.setUint16(offset, 1, Endian.little);
+      offset += 2; // mono
+      bd.setUint32(offset, sampleRate, Endian.little);
+      offset += 4;
+      bd.setUint32(offset, sampleRate * 2, Endian.little);
+      offset += 4;
+      bd.setUint16(offset, 2, Endian.little);
+      offset += 2;
+      bd.setUint16(offset, 16, Endian.little);
+      offset += 2;
+      // Unknown chunk 1: "TST1" size=5
+      for (final c in 'TST1'.codeUnits) { bd.setUint8(offset++, c); }
+      bd.setUint32(offset, 5, Endian.little);
+      offset += 4;
+      for (var i = 0; i < 5; i++) {
+        bd.setUint8(offset++, 0xAA);
+      }
+      bd.setUint8(offset++, 0); // padding byte
+      // Unknown chunk 2: "TST2" size=3
+      for (final c in 'TST2'.codeUnits) { bd.setUint8(offset++, c); }
+      bd.setUint32(offset, 3, Endian.little);
+      offset += 4;
+      for (var i = 0; i < 3; i++) {
+        bd.setUint8(offset++, 0xBB);
+      }
+      bd.setUint8(offset++, 0); // padding byte
+      // data chunk
+      for (final c in 'data'.codeUnits) { bd.setUint8(offset++, c); }
+      bd.setUint32(offset, dataSize, Endian.little);
+      offset += 4;
+      for (var i = 0; i < numSamples; i++) {
+        bd.setInt16(offset, (i + 1) * 100, Endian.little);
+        offset += 2;
+      }
+
+      final result = decodeWav(bd.buffer.asUint8List());
+      expect(result.metadata.channels, equals(1));
+      expect(result.samples[0].length, equals(numSamples));
+      // Verify samples decoded correctly
+      expect(result.samples[0][0], closeTo(100 / 32768.0, 0.001));
+    });
+  });
+
   group('WAV decoder – missing fmt chunk', () {
     test('throws CorruptFileException when fmt chunk is absent', () {
       final wav = buildWavMissingFmt();

@@ -54,6 +54,39 @@ void main() {
     });
   });
 
+  group('Defect', () {
+    test('toString contains type and offset', () {
+      final defect = Defect(
+        type: DefectType.click,
+        offset: const Duration(milliseconds: 150),
+        length: const Duration(milliseconds: 2),
+        confidence: 0.85,
+        amplitude: 0.92,
+        sampleIndex: 6615,
+        channel: 0,
+      );
+      final str = defect.toString();
+      expect(str, contains('click'));
+      expect(str, contains('150'));
+      expect(str, contains('0.850'));
+    });
+
+    test('toString with pop type contains pop', () {
+      final defect = Defect(
+        type: DefectType.pop,
+        offset: const Duration(milliseconds: 500),
+        length: const Duration(milliseconds: 10),
+        confidence: 0.7,
+        amplitude: 0.5,
+        sampleIndex: 22050,
+        channel: 1,
+      );
+      final str = defect.toString();
+      expect(str, contains('pop'));
+      expect(str, contains('500'));
+    });
+  });
+
   group('Exceptions', () {
     test('UnsupportedFormatException has readable toString', () {
       const e = UnsupportedFormatException('test message');

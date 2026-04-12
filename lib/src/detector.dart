@@ -16,6 +16,7 @@ library;
 
 import 'dart:math' as math;
 import 'dart:typed_data';
+import 'math_utils.dart';
 import 'models.dart';
 
 // ---------------------------------------------------------------------------
@@ -188,34 +189,16 @@ Float32List _buildAdaptiveThreshold(
     for (int j = start; j < end; j++) {
       window[j - start] = diff[j].abs();
     }
-    final mad = _mad(window);
+    final madValue = mad(window);
     // MAD → sigma: multiply by consistency factor for normal distribution.
-    threshold[i] = mad * _kMadScaleFactor * multiplier;
+    threshold[i] = madValue * _kMadScaleFactor * multiplier;
     // Enforce a minimum floor to avoid spurious detections in digital silence.
     if (threshold[i] < _kThresholdFloor) threshold[i] = _kThresholdFloor;
   }
   return threshold;
 }
 
-/// Median Absolute Deviation of [values] (already absolute).
-double _mad(Float32List values) {
-  if (values.isEmpty) return 0.0;
-  final sorted = Float32List.fromList(values)..sort();
-  final median = _median(sorted);
-  final deviations = Float32List(sorted.length);
-  for (int i = 0; i < sorted.length; i++) {
-    deviations[i] = (sorted[i] - median).abs();
-  }
-  deviations.sort();
-  return _median(deviations);
-}
-
-double _median(Float32List sorted) {
-  final n = sorted.length;
-  if (n == 0) return 0.0;
-  if (n.isOdd) return sorted[n ~/ 2];
-  return (sorted[n ~/ 2 - 1] + sorted[n ~/ 2]) / 2.0;
-}
+// median() and mad() are in math_utils.dart (public API).
 
 // ---------------------------------------------------------------------------
 // Region merging
