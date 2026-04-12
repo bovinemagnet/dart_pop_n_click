@@ -1,6 +1,10 @@
-## 0.0.2 (2026-04-12)
+## 0.0.2 (2026-04-13)
 
 - **Breaking:** `analyseBytes()`, `analysePcm()`, and `analyseSamples()` are now synchronous — they return `AnalysisResult` directly instead of `Future<AnalysisResult>`. Only `analyseFile()` remains async (file I/O).
+- AIFF and AIFF-C format support (big-endian PCM and `sowt` little-endian variant)
+- Signed 8-bit PCM support (used by AIFF)
+- Auto-detection of AIFF files via magic bytes and `.aiff`/`.aif`/`.aifc` extensions
+- Expanded test suite to 192 tests
 
 ## 0.0.1 (2026-04-12)
 

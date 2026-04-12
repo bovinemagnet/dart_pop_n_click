@@ -103,7 +103,7 @@ Future<void> main(List<String> args) async {
 
   if (topLevel['version'] as bool) {
     // TODO: Keep in sync with version in pubspec.yaml.
-    stdout.writeln('audiodefect 0.0.1');
+    stdout.writeln('audiodefect 0.0.2');
     exit(_exitClean);
   }
 
