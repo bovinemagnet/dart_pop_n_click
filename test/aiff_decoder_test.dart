@@ -289,6 +289,36 @@ void main() {
     });
 
     // -----------------------------------------------------------------------
+    // 32-bit big-endian mono
+    // -----------------------------------------------------------------------
+
+    group('32-bit big-endian mono', () {
+      test('zero normalises to 0.0', () {
+        final pcm = ByteData(4);
+        pcm.setInt32(0, 0, Endian.big);
+        final aiff = buildAiff(channels: 1, bitDepth: 32, pcmData: pcm.buffer.asUint8List());
+        final result = decodeAiff(aiff);
+        expect(result.samples[0][0], closeTo(0.0, 0.001));
+      });
+
+      test('max positive normalises to ~1.0', () {
+        final pcm = ByteData(4);
+        pcm.setInt32(0, 2147483647, Endian.big);
+        final aiff = buildAiff(channels: 1, bitDepth: 32, pcmData: pcm.buffer.asUint8List());
+        final result = decodeAiff(aiff);
+        expect(result.samples[0][0], closeTo(1.0, 0.001));
+      });
+
+      test('max negative normalises to -1.0', () {
+        final pcm = ByteData(4);
+        pcm.setInt32(0, -2147483648, Endian.big);
+        final aiff = buildAiff(channels: 1, bitDepth: 32, pcmData: pcm.buffer.asUint8List());
+        final result = decodeAiff(aiff);
+        expect(result.samples[0][0], closeTo(-1.0, 0.001));
+      });
+    });
+
+    // -----------------------------------------------------------------------
     // AIFF-C variants
     // -----------------------------------------------------------------------
 

@@ -1,5 +1,5 @@
 import 'package:test/test.dart';
-import 'package:audio_defect_detector/src/models.dart';
+import 'package:audio_defect_detector/audio_defect_detector.dart';
 
 void main() {
   group('DetectorConfig', () {
@@ -84,6 +84,31 @@ void main() {
       final str = defect.toString();
       expect(str, contains('pop'));
       expect(str, contains('500'));
+    });
+  });
+
+  group('PcmFormat', () {
+    test('bytesPerSample is bitDepth ~/ 8', () {
+      expect(PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1).bytesPerSample, equals(1));
+      expect(PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 1).bytesPerSample, equals(2));
+      expect(PcmFormat(sampleRate: 44100, bitDepth: 24, channels: 1).bytesPerSample, equals(3));
+      expect(PcmFormat(sampleRate: 44100, bitDepth: 32, channels: 1).bytesPerSample, equals(4));
+    });
+
+    test('bytesPerFrame is bytesPerSample * channels', () {
+      expect(PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 1).bytesPerFrame, equals(2));
+      expect(PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 2).bytesPerFrame, equals(4));
+      expect(PcmFormat(sampleRate: 44100, bitDepth: 24, channels: 6).bytesPerFrame, equals(18));
+    });
+
+    test('signed8bit defaults to false', () {
+      final fmt = PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1);
+      expect(fmt.signed8bit, isFalse);
+    });
+
+    test('signed8bit can be set to true', () {
+      final fmt = PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
+      expect(fmt.signed8bit, isTrue);
     });
   });
 

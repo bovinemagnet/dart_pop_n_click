@@ -73,6 +73,53 @@ File createTestWav(List<int> samples, {int sampleRate = 44100}) {
   return file;
 }
 
+/// Create a temporary AIFF file (16-bit mono PCM) containing [samples].
+///
+/// The caller is responsible for deleting the parent temp directory when done.
+File createTestAiff(List<int> samples, {int sampleRate = 44100}) {
+  final numSamples = samples.length;
+  final dataSize = numSamples * 2; // 16-bit
+  final ssndChunkSize = 8 + dataSize; // offset + blockSize + data
+  final commChunkSize = 18; // standard AIFF COMM
+  final formSize = 4 + (8 + commChunkSize) + (8 + ssndChunkSize);
+  final totalSize = 12 + (8 + commChunkSize) + (8 + ssndChunkSize);
+
+  final bd = ByteData(totalSize);
+  var offset = 0;
+
+  // FORM header
+  for (final c in 'FORM'.codeUnits) { bd.setUint8(offset++, c); }
+  bd.setUint32(offset, formSize, Endian.big); offset += 4;
+  for (final c in 'AIFF'.codeUnits) { bd.setUint8(offset++, c); }
+
+  // COMM chunk
+  for (final c in 'COMM'.codeUnits) { bd.setUint8(offset++, c); }
+  bd.setUint32(offset, commChunkSize, Endian.big); offset += 4;
+  bd.setInt16(offset, 1, Endian.big); offset += 2; // channels
+  bd.setUint32(offset, numSamples, Endian.big); offset += 4; // numFrames
+  bd.setInt16(offset, 16, Endian.big); offset += 2; // bitDepth
+  // 80-bit extended for 44100: exponent=0x400E, mantissa=0xAC44000000000000
+  bd.setUint8(offset++, 0x40);
+  bd.setUint8(offset++, 0x0E);
+  bd.setUint8(offset++, 0xAC);
+  bd.setUint8(offset++, 0x44);
+  for (var i = 0; i < 6; i++) { bd.setUint8(offset++, 0); }
+
+  // SSND chunk
+  for (final c in 'SSND'.codeUnits) { bd.setUint8(offset++, c); }
+  bd.setUint32(offset, ssndChunkSize, Endian.big); offset += 4;
+  bd.setUint32(offset, 0, Endian.big); offset += 4; // data offset
+  bd.setUint32(offset, 0, Endian.big); offset += 4; // blockSize
+  for (var i = 0; i < numSamples; i++) {
+    bd.setInt16(offset, samples[i], Endian.big); offset += 2;
+  }
+
+  final tmpDir = Directory.systemTemp.createTempSync('cli_aiff_test_');
+  final file = File('${tmpDir.path}/test.aiff');
+  file.writeAsBytesSync(bd.buffer.asUint8List());
+  return file;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -320,6 +367,47 @@ void main() {
         '--channels=1',
       ]);
       expect(result.exitCode, equals(2));
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // AIFF files
+  // -----------------------------------------------------------------------
+
+  group('CLI – AIFF files', () {
+    test('clean AIFF file exits 0', () async {
+      final file = createTestAiff(List.filled(44100, 0));
+      try {
+        final result = await runCli(['analyse', file.path]);
+        expect(result.exitCode, equals(0));
+      } finally {
+        file.parent.deleteSync(recursive: true);
+      }
+    });
+
+    test('AIFF with click detected', () async {
+      final samples = List.filled(44100, 0);
+      samples[22050] = 32767;
+      samples[22051] = -32768;
+      final file = createTestAiff(samples);
+      try {
+        final result = await runCli(['analyse', file.path]);
+        expect(result.stdout.toString(), contains('defect(s) found'));
+      } finally {
+        file.parent.deleteSync(recursive: true);
+      }
+    });
+
+    test('--output=json works with AIFF', () async {
+      final file = createTestAiff(List.filled(44100, 0));
+      try {
+        final result = await runCli(['analyse', file.path, '--output=json']);
+        expect(result.exitCode, equals(0));
+        final json = jsonDecode(result.stdout.toString());
+        expect(json, isA<Map>());
+      } finally {
+        file.parent.deleteSync(recursive: true);
+      }
     });
   });
 

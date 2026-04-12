@@ -406,6 +406,41 @@ void main() {
     });
 
     // -------------------------------------------------------------------
+    // 8-bit signed (signed8bit: true)
+    // -------------------------------------------------------------------
+    group('8-bit signed (signed8bit: true)', () {
+      test('0 normalises to 0.0', () {
+        final format = PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
+        final bytes = Uint8List.fromList([0]);
+        final result = decodePcmBytes(bytes, format);
+        expect(result[0][0], closeTo(0.0, 0.01));
+      });
+
+      test('127 normalises to ~1.0', () {
+        final format = PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
+        final bytes = Uint8List.fromList([127]);
+        final result = decodePcmBytes(bytes, format);
+        expect(result[0][0], closeTo(127 / 128.0, 0.01));
+      });
+
+      test('0x80 (-128 signed) normalises to -1.0', () {
+        final format = PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
+        final bytes = Uint8List.fromList([0x80]);
+        final result = decodePcmBytes(bytes, format);
+        expect(result[0][0], closeTo(-1.0, 0.01));
+      });
+
+      test('unsigned vs signed 8-bit produce different results for same byte', () {
+        final unsignedFmt = PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: false);
+        final signedFmt = PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
+        final bytes = Uint8List.fromList([200]); // unsigned: (200-128)/128=0.5625, signed: -56/128=-0.4375
+        final unsigned = decodePcmBytes(bytes, unsignedFmt);
+        final signed = decodePcmBytes(bytes, signedFmt);
+        expect(unsigned[0][0], isNot(closeTo(signed[0][0], 0.01)));
+      });
+    });
+
+    // -------------------------------------------------------------------
     // PcmFormat invalid combinations
     // -------------------------------------------------------------------
     group('PcmFormat invalid combinations', () {
