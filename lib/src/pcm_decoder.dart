@@ -51,9 +51,14 @@ void _decodeInteger(
       final double normalised;
       switch (format.bitDepth) {
         case 8:
-          // 8-bit PCM is unsigned
           final v = byteData.getUint8(byteOffset);
-          normalised = (v - 128) / 128.0;
+          if (format.signed8bit) {
+            // 8-bit signed (AIFF)
+            normalised = v.toSigned(8) / 128.0;
+          } else {
+            // 8-bit unsigned (WAV)
+            normalised = (v - 128) / 128.0;
+          }
         case 16:
           final v = byteData.getInt16(byteOffset, endian);
           normalised = v / 32768.0;

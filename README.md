@@ -4,7 +4,8 @@ Pure Dart library to detect pops and clicks in WAV audio files.
 
 ## Features
 
-- Detect clicks (1–10 samples) and pops (10–150 samples) in WAV audio
+- Detect clicks (1–10 samples) and pops (10–150 samples) in WAV and AIFF audio
+- AIFF and AIFF-C format support (big-endian PCM, `sowt` little-endian variant)
 - Adaptive MAD-based threshold with configurable sensitivity
 - Support for PCM 8/16/24/32-bit and IEEE Float 32-bit WAV files
 - Raw PCM byte analysis without WAV headers
@@ -104,7 +105,7 @@ For audio that has already been decoded to raw PCM bytes (e.g. from FLAC decoder
 import 'package:audio_defect_detector/audio_defect_detector.dart';
 
 // Analyse raw 16-bit signed LE stereo PCM bytes
-final result = await analysePcm(
+final result = analysePcm(
   pcmBytes,
   format: PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 2),
 );
@@ -114,7 +115,7 @@ For pre-normalised Float32 samples:
 
 ```dart
 // samples is List<Float32List> — one per channel, values in [-1.0, 1.0]
-final result = await analyseSamples(
+final result = analyseSamples(
   samples,
   sampleRate: 44100,
 );
@@ -231,6 +232,8 @@ $ audiodefect analyse recording.raw --raw --sample-rate=48000 --bit-depth=24 --c
 |---|---|---|
 | 1 | WAV PCM 8/16/24/32-bit, mono/stereo | ✅ Supported |
 | 1 | WAV IEEE Float 32-bit | ✅ Supported |
+| 1 | AIFF PCM 8/16/24/32-bit, mono/stereo | ✅ Supported |
+| 1 | AIFF-C (`NONE` and `sowt` variants) | ✅ Supported |
 | 2 | FLAC 16/24-bit, mono/stereo | 🔜 Planned |
 
 ---
@@ -247,6 +250,7 @@ dart test
 ## Limitations
 
 - Maximum file size: 2 GB (files are loaded entirely into memory)
-- Only WAV format is currently supported (FLAC planned for future release)
+- FLAC format is not yet supported (planned for future release)
+- AIFF-C compressed formats other than `NONE`/`sowt` are not supported
 - Glob support in CLI is limited to simple `prefix*suffix` patterns
 

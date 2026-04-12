@@ -1,6 +1,8 @@
 #!/usr/bin/env dart
 /// `audiodefect` — Command-line interface for the audio_defect_detector library.
 ///
+/// Supported formats: WAV (.wav), AIFF (.aiff, .aif, .aifc).
+///
 /// Usage:
 ///   audiodefect analyse `<file|glob>` [options]
 ///
@@ -40,8 +42,8 @@ Future<void> main(List<String> args) async {
         ..addOption(
           'format',
           abbr: 'f',
-          help: 'Override format detection (wav).',
-          allowed: ['wav'],
+          help: 'Override format detection (wav, aiff).',
+          allowed: ['wav', 'aiff'],
         )
         ..addOption(
           'sensitivity',
@@ -193,7 +195,7 @@ Future<void> _runAnalyse(ArgResults cmd) async {
       if (!quiet && verbose) stderr.writeln('Analysing $path …');
       if (isRaw) {
         final bytes = Uint8List.fromList(await File(path).readAsBytes());
-        result = await analysePcm(bytes, format: pcmFormat!, config: config);
+        result = analysePcm(bytes, format: pcmFormat!, config: config);
       } else {
         result = await analyseFile(path, config: config);
       }
@@ -234,7 +236,7 @@ Future<void> _runAnalyse(ArgResults cmd) async {
       if (!quiet && verbose) stderr.writeln('Analysing $path …');
       if (isRaw) {
         final bytes = Uint8List.fromList(await File(path).readAsBytes());
-        result = await analysePcm(bytes, format: pcmFormat!, config: config);
+        result = analysePcm(bytes, format: pcmFormat!, config: config);
       } else {
         result = await analyseFile(path, config: config);
       }
@@ -393,13 +395,14 @@ bool _matchGlob(String pattern, String name) {
 void _usage(ArgParser parser, [String? error]) {
   if (error != null) stderr.writeln('Error: $error\n');
   stdout
-    ..writeln('audiodefect — Audio pop/click defect detector')
+    ..writeln('audiodefect — Audio pop/click defect detector (WAV, AIFF)')
     ..writeln()
     ..writeln('Usage:')
     ..writeln('  audiodefect analyse <file|glob> [options]')
     ..writeln()
     ..writeln('Examples:')
     ..writeln('  audiodefect analyse recording.wav')
+    ..writeln('  audiodefect analyse recording.aiff')
     ..writeln('  audiodefect analyse recording.raw --raw --sample-rate=48000 --bit-depth=24 --channels=1')
     ..writeln()
     ..writeln('Options:')

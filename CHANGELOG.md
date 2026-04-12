@@ -1,3 +1,7 @@
+## 0.0.2 (2026-04-12)
+
+- **Breaking:** `analyseBytes()`, `analysePcm()`, and `analyseSamples()` are now synchronous — they return `AnalysisResult` directly instead of `Future<AnalysisResult>`. Only `analyseFile()` remains async (file I/O).
+
 ## 0.0.1 (2026-04-12)
 
 - Initial release
@@ -13,3 +17,6 @@
 - CLI `--raw` mode with `--sample-rate`, `--bit-depth`, `--channels`, `--float` options
 - Comprehensive test suite (153 tests)
 - Security hardening: file size limits, WAV chunk validation, block alignment checks
+- AIFF and AIFF-C format support (standard big-endian and `sowt` little-endian variant)
+- Signed 8-bit PCM support (used by AIFF)
+- Auto-detection of AIFF files via magic bytes and `.aiff`/`.aif`/`.aifc` extensions

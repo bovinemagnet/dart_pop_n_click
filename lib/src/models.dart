@@ -186,12 +186,17 @@ class PcmFormat {
   final bool isFloat;
   final Endian endian;
 
+  /// Whether 8-bit samples are signed (AIFF) or unsigned (WAV).
+  /// Only relevant when bitDepth == 8. Defaults to false (unsigned).
+  final bool signed8bit;
+
   const PcmFormat({
     required this.sampleRate,
     required this.bitDepth,
     required this.channels,
     this.isFloat = false,
     this.endian = Endian.little,
+    this.signed8bit = false,
   });
 
   /// Bytes per single sample (one channel, one frame).

@@ -4,6 +4,97 @@ import 'package:test/test.dart';
 import 'package:audio_defect_detector/audio_defect_detector.dart';
 
 // ---------------------------------------------------------------------------
+// AIFF builder helpers (for integration tests)
+// ---------------------------------------------------------------------------
+
+/// Build an 80-bit IEEE 754 extended precision float for common sample rates.
+Uint8List _buildExtended(double value) {
+  // Use a lookup table of pre-computed byte sequences for common rates.
+  final known = <double, List<int>>{
+    44100.0: [0x40, 0x0E, 0xAC, 0x44, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    48000.0: [0x40, 0x0E, 0xBB, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+    8000.0: [0x40, 0x0B, 0xFA, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00],
+  };
+
+  if (known.containsKey(value)) {
+    return Uint8List.fromList(known[value]!);
+  }
+
+  // Fallback: manually encode the integer value.
+  final bytes = ByteData(10);
+  final intVal = value.toInt();
+  if (intVal <= 0) return bytes.buffer.asUint8List();
+
+  final log2 = intVal.bitLength - 1;
+  final exp = 16383 + log2;
+  final mantissa = intVal << (63 - log2);
+
+  bytes.setUint16(0, exp, Endian.big);
+  bytes.setUint32(2, (mantissa >> 32) & 0xFFFFFFFF, Endian.big);
+  bytes.setUint32(6, mantissa & 0xFFFFFFFF, Endian.big);
+
+  return bytes.buffer.asUint8List();
+}
+
+/// Build a minimal AIFF byte array for integration testing.
+Uint8List buildAiffForAnalyser({
+  int channels = 1,
+  int bitDepth = 16,
+  int sampleRate = 44100,
+  required Uint8List pcmData,
+}) {
+  final numFrames = pcmData.length ~/ (channels * (bitDepth ~/ 8));
+  final commChunkDataSize = 18;
+  final ssndChunkDataSize = 8 + pcmData.length;
+  final totalSize = 12 + (8 + commChunkDataSize) + (8 + ssndChunkDataSize);
+
+  final bd = ByteData(totalSize);
+  var offset = 0;
+
+  for (final c in 'FORM'.codeUnits) {
+    bd.setUint8(offset++, c);
+  }
+  bd.setUint32(offset, totalSize - 8, Endian.big);
+  offset += 4;
+  for (final c in 'AIFF'.codeUnits) {
+    bd.setUint8(offset++, c);
+  }
+
+  // COMM chunk
+  for (final c in 'COMM'.codeUnits) {
+    bd.setUint8(offset++, c);
+  }
+  bd.setUint32(offset, commChunkDataSize, Endian.big);
+  offset += 4;
+  bd.setInt16(offset, channels, Endian.big);
+  offset += 2;
+  bd.setUint32(offset, numFrames, Endian.big);
+  offset += 4;
+  bd.setInt16(offset, bitDepth, Endian.big);
+  offset += 2;
+  final extBytes = _buildExtended(sampleRate.toDouble());
+  for (var i = 0; i < 10; i++) {
+    bd.setUint8(offset++, extBytes[i]);
+  }
+
+  // SSND chunk
+  for (final c in 'SSND'.codeUnits) {
+    bd.setUint8(offset++, c);
+  }
+  bd.setUint32(offset, ssndChunkDataSize, Endian.big);
+  offset += 4;
+  bd.setUint32(offset, 0, Endian.big);
+  offset += 4; // offset field
+  bd.setUint32(offset, 0, Endian.big);
+  offset += 4; // blockSize field
+  for (var i = 0; i < pcmData.length; i++) {
+    bd.setUint8(offset++, pcmData[i]);
+  }
+
+  return bd.buffer.asUint8List();
+}
+
+// ---------------------------------------------------------------------------
 // Raw PCM builder helpers
 // ---------------------------------------------------------------------------
 
@@ -98,7 +189,7 @@ void main() {
       floats[10001] = -0.98;
 
       final wav = buildWav16MonoFromFloats(floats, sampleRate: sampleRate);
-      final result = await analyseBytes(
+      final result = analyseBytes(
         wav,
         config: const DetectorConfig(sensitivity: Sensitivity.high),
       );
@@ -115,7 +206,7 @@ void main() {
       final floats = List<double>.filled(sampleRate, 0.0);
       final wav = buildWav16MonoFromFloats(floats, sampleRate: sampleRate);
 
-      final result = await analyseBytes(wav);
+      final result = analyseBytes(wav);
       expect(result.defects, isEmpty);
       expect(result.aggregateConfidence, equals(0.0));
     });
@@ -189,7 +280,7 @@ void main() {
         channels: 2,
       );
 
-      final result = await analysePcm(
+      final result = analysePcm(
         bytes,
         format: format,
         config: const DetectorConfig(sensitivity: Sensitivity.high),
@@ -216,7 +307,7 @@ void main() {
         channels: 1,
       );
 
-      final result = await analysePcm(bytes, format: format);
+      final result = analysePcm(bytes, format: format);
       expect(result.defects, isEmpty);
     });
 
@@ -239,12 +330,12 @@ void main() {
         channels: 1,
       );
 
-      final resultHigh = await analysePcm(
+      final resultHigh = analysePcm(
         bytes,
         format: format,
         config: const DetectorConfig(sensitivity: Sensitivity.high),
       );
-      final resultLow = await analysePcm(
+      final resultLow = analysePcm(
         bytes,
         format: format,
         config: const DetectorConfig(sensitivity: Sensitivity.low),
@@ -268,7 +359,7 @@ void main() {
       channel[22050] = 0.98;
       channel[22051] = -0.98;
 
-      final result = await analyseSamples(
+      final result = analyseSamples(
         [channel],
         sampleRate: sampleRate,
         config: const DetectorConfig(sensitivity: Sensitivity.high),
@@ -281,7 +372,7 @@ void main() {
       const sampleRate = 44100;
       final channel = Float32List(sampleRate); // all zeros
 
-      final result = await analyseSamples(
+      final result = analyseSamples(
         [channel],
         sampleRate: sampleRate,
       );
@@ -291,7 +382,7 @@ void main() {
     });
 
     test('empty channels returns no defects', () async {
-      final result = await analyseSamples(
+      final result = analyseSamples(
         [Float32List(0)],
         sampleRate: 44100,
       );
@@ -378,7 +469,7 @@ void main() {
       final format =
           PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 1);
       final bytes = Uint8List(0);
-      final result = await analysePcm(bytes, format: format);
+      final result = analysePcm(bytes, format: format);
       expect(result.defects, isEmpty);
       expect(result.aggregateConfidence, equals(0.0));
     });
@@ -391,7 +482,7 @@ void main() {
   group('analyseSamples() – edge cases', () {
     test('single-sample channels returns no defects', () async {
       final samples = [Float32List.fromList([0.5])];
-      final result = await analyseSamples(samples, sampleRate: 44100);
+      final result = analyseSamples(samples, sampleRate: 44100);
       expect(result.defects, isEmpty);
     });
 
@@ -400,7 +491,7 @@ void main() {
         Float32List(44100),
         Float32List(44100),
       ]; // 1 second stereo
-      final result = await analyseSamples(samples,
+      final result = analyseSamples(samples,
           sampleRate: 44100, bitDepth: 24);
       expect(result.metadata.sampleRate, equals(44100));
       expect(result.metadata.bitDepth, equals(24));
@@ -415,12 +506,12 @@ void main() {
       samples[22050] = 0.3; // weak
       samples[22051] = -0.3;
 
-      final highResult = await analyseSamples(
+      final highResult = analyseSamples(
         [samples],
         sampleRate: 44100,
         config: DetectorConfig(sensitivity: Sensitivity.high),
       );
-      final lowResult = await analyseSamples(
+      final lowResult = analyseSamples(
         [samples],
         sampleRate: 44100,
         config: DetectorConfig(sensitivity: Sensitivity.low),
@@ -428,6 +519,77 @@ void main() {
       // High sensitivity should find more or equal defects than low
       expect(highResult.defects.length,
           greaterThanOrEqualTo(lowResult.defects.length));
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // analyseBytes() – AIFF integration
+  // -------------------------------------------------------------------------
+
+  group('analyseBytes() – AIFF', () {
+    test('detects defects in AIFF with click', () async {
+      // Build 1 second of silence with a click spike injected
+      const sampleRate = 44100;
+      final numSamples = sampleRate;
+      final pcmBd = ByteData(numSamples * 2); // 16-bit mono
+
+      // Fill with silence, then inject a sharp click at sample 22050
+      for (var i = 0; i < numSamples; i++) {
+        pcmBd.setInt16(i * 2, 0, Endian.big);
+      }
+      pcmBd.setInt16(22050 * 2, 32000, Endian.big); // sharp positive spike
+      pcmBd.setInt16(22051 * 2, -32000, Endian.big); // sharp negative spike
+
+      final aiff = buildAiffForAnalyser(
+        channels: 1,
+        bitDepth: 16,
+        sampleRate: sampleRate,
+        pcmData: pcmBd.buffer.asUint8List(),
+      );
+
+      final result = analyseBytes(
+        aiff,
+        config: const DetectorConfig(sensitivity: Sensitivity.high),
+      );
+
+      expect(result.defects, isNotEmpty);
+      expect(result.metadata.sampleRate, equals(sampleRate));
+      expect(result.metadata.channels, equals(1));
+    });
+
+    test('returns no defects for silent AIFF', () async {
+      const sampleRate = 44100;
+      final numSamples = sampleRate;
+      final pcmData = Uint8List(numSamples * 2); // all zeros = silence
+
+      final aiff = buildAiffForAnalyser(
+        channels: 1,
+        bitDepth: 16,
+        sampleRate: sampleRate,
+        pcmData: pcmData,
+      );
+
+      final result = analyseBytes(aiff);
+      expect(result.defects, isEmpty);
+      expect(result.aggregateConfidence, equals(0.0));
+    });
+
+    test('auto-detects AIFF format from magic bytes', () async {
+      // Build a silent AIFF, pass without path
+      const sampleRate = 44100;
+      final pcmData = Uint8List(1000 * 2); // 1000 frames of silence
+
+      final aiff = buildAiffForAnalyser(
+        channels: 1,
+        bitDepth: 16,
+        sampleRate: sampleRate,
+        pcmData: pcmData,
+      );
+
+      // Should not throw UnsupportedFormatException – AIFF is auto-detected
+      final result = analyseBytes(aiff);
+      expect(result.metadata.sampleRate, equals(sampleRate));
+      expect(result.metadata.channels, equals(1));
     });
   });
 }

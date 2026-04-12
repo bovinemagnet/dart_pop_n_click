@@ -1,9 +1,10 @@
-/// Top-level asynchronous API for analysing audio files.
+/// Top-level API for analysing audio files.
 library;
 
 import 'dart:io';
 import 'dart:typed_data';
 import 'models.dart';
+import 'aiff_decoder.dart';
 import 'wav_decoder.dart';
 import 'pcm_decoder.dart';
 import 'detector.dart';
@@ -14,7 +15,7 @@ import 'detector.dart';
 
 /// Analyse the audio file at [path] and return an [AnalysisResult].
 ///
-/// The format is auto-detected from the file extension (`.wav`) and validated
+/// The format is auto-detected from the file extension (`.wav`, `.aiff`, `.aif`, `.aifc`) and validated
 /// against the file's magic bytes.  A [config] can be passed to tune
 /// sensitivity and filtering.
 ///
@@ -49,16 +50,18 @@ Future<AnalysisResult> analyseFile(
 /// Throws:
 /// - [UnsupportedFormatException] if the format is not supported.
 /// - [CorruptFileException] if the data is malformed.
-Future<AnalysisResult> analyseBytes(
+AnalysisResult analyseBytes(
   Uint8List bytes, {
   String? path,
   DetectorConfig config = const DetectorConfig(),
-}) async {
+}) {
   final format = _detectFormat(bytes, path);
 
   switch (format) {
     case _AudioFormat.wav:
       return _analyseWav(bytes, config);
+    case _AudioFormat.aiff:
+      return _analyseAiff(bytes, config);
   }
 }
 
@@ -69,11 +72,11 @@ Future<AnalysisResult> analyseBytes(
 /// format up-front.
 ///
 /// Throws [CorruptFileException] if byte length is mis-aligned.
-Future<AnalysisResult> analysePcm(
+AnalysisResult analysePcm(
   Uint8List bytes, {
   required PcmFormat format,
   DetectorConfig config = const DetectorConfig(),
-}) async {
+}) {
   final channels = decodePcmBytes(bytes, format);
   return _analyseSamples(channels, format.sampleRate, format, config);
 }
@@ -82,12 +85,12 @@ Future<AnalysisResult> analysePcm(
 ///
 /// The caller must provide a [sampleRate] so that defect offsets can be
 /// expressed in wall-clock time.
-Future<AnalysisResult> analyseSamples(
+AnalysisResult analyseSamples(
   List<Float32List> channelSamples, {
   required int sampleRate,
   int bitDepth = 16,
   DetectorConfig config = const DetectorConfig(),
-}) async {
+}) {
   final totalFrames =
       channelSamples.isEmpty ? 0 : channelSamples[0].length;
   final durationMs =
@@ -137,7 +140,7 @@ AnalysisResult _analyseSamples(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-enum _AudioFormat { wav }
+enum _AudioFormat { wav, aiff }
 
 _AudioFormat _detectFormat(Uint8List bytes, String? path) {
   // Magic bytes check takes priority
@@ -151,17 +154,41 @@ _AudioFormat _detectFormat(Uint8List bytes, String? path) {
         bytes[10] == 0x56 && // V
         bytes[11] == 0x45; // E
     if (isRiff && isWave) return _AudioFormat.wav;
+
+    // AIFF: "FORM" at 0-3, "AIFF" or "AIFC" at 8-11
+    if (bytes[0] == 0x46 && bytes[1] == 0x4F && bytes[2] == 0x52 && bytes[3] == 0x4D) {
+      if ((bytes[8] == 0x41 && bytes[9] == 0x49 && bytes[10] == 0x46 && bytes[11] == 0x46) ||
+          (bytes[8] == 0x41 && bytes[9] == 0x49 && bytes[10] == 0x46 && bytes[11] == 0x43)) {
+        return _AudioFormat.aiff;
+      }
+    }
   }
 
   // Fall back to file extension
   if (path != null) {
     final ext = path.toLowerCase().split('.').last;
-    if (ext == 'wav') return _AudioFormat.wav;
+    switch (ext) {
+      case 'wav':
+        return _AudioFormat.wav;
+      case 'aiff' || 'aif' || 'aifc':
+        return _AudioFormat.aiff;
+    }
   }
 
   throw UnsupportedFormatException(
     'Cannot detect supported audio format from magic bytes or extension. '
-    'Currently only WAV (PCM) is supported.',
+    'Currently only WAV (PCM) and AIFF/AIFC are supported.',
+  );
+}
+
+AnalysisResult _analyseAiff(Uint8List bytes, DetectorConfig config) {
+  final aiffData = decodeAiff(bytes);
+  final defects = detectDefects(aiffData.samples, aiffData.metadata.sampleRate, config);
+  final confidence = computeAggregateConfidence(defects);
+  return AnalysisResult(
+    defects: defects,
+    aggregateConfidence: confidence,
+    metadata: aiffData.metadata,
   );
 }
 
