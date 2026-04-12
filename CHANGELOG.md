@@ -1,4 +1,4 @@
-## 0.1.0 (2026-04-12)
+## 0.0.1 (2026-04-12)
 
 - Initial release
 - WAV PCM (8/16/24/32-bit) and IEEE Float 32-bit support

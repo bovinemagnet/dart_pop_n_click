@@ -1,6 +1,6 @@
 name: audio_defect_detector
 description: "Pure Dart library to detect pops and clicks in WAV audio files using adaptive threshold analysis."
-version: 0.1.0
+version: 0.0.1
 repository: https://github.com/bovinemagnet/dart_pop_n_click
 homepage: https://github.com/bovinemagnet/dart_pop_n_click
 topics:
