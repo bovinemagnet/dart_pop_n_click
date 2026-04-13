@@ -79,7 +79,7 @@ Analyses a `Uint8List` of audio bytes and returns a `Future<AnalysisResult>`.
 | `defects` | `List<Defect>` sorted by time offset. |
 | `aggregateConfidence` | Overall file-level defect probability (0.0–1.0). |
 | `metadata` | `AudioMetadata` (sample rate, bit depth, channels, duration). |
-| `dcOffsetPerChannel` | `List<double>` — per-channel mean sample bias (normalised to [-1.0, 1.0]). Values near 0.0 indicate no DC offset; larger magnitudes indicate a recording or decoder bias. |
+| `dcOffsetPerChannel` | `List<double>` — per-channel mean sample bias (normalised to \[-1.0, 1.0\]). Values near 0.0 indicate no DC offset; larger magnitudes indicate a recording or decoder bias. |
 
 ### `Defect`
 | Field | Description |
@@ -125,7 +125,7 @@ final result = analysePcm(
 For pre-normalised Float32 samples:
 
 ```dart
-// samples is List<Float32List> — one per channel, values in [-1.0, 1.0]
+// samples is List<Float32List> — one per channel, values in \[-1.0, 1.0\]
 final result = analyseSamples(
   samples,
   sampleRate: 44100,

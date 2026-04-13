@@ -1,4 +1,5 @@
 #!/usr/bin/env dart
+
 /// `audiodefect` — Command-line interface for the audio_defect_detector library.
 ///
 /// Supported formats: WAV (.wav), AIFF (.aiff, .aif, .aifc).
@@ -60,7 +61,8 @@ Future<void> main(List<String> args) async {
         ..addOption(
           'threshold',
           abbr: 't',
-          help: 'Exit with code 1 when defects above this confidence are found.',
+          help:
+              'Exit with code 1 when defects above this confidence are found.',
           defaultsTo: '0.0',
         )
         ..addOption(
@@ -70,9 +72,12 @@ Future<void> main(List<String> args) async {
           allowed: ['text', 'json'],
           defaultsTo: 'text',
         )
-        ..addFlag('quiet', abbr: 'q', help: 'Suppress all output.', negatable: false)
-        ..addFlag('verbose', abbr: 'v', help: 'Show extra diagnostics.', negatable: false)
-        ..addFlag('raw', help: 'Treat input as raw PCM (no header).', negatable: false)
+        ..addFlag('quiet',
+            abbr: 'q', help: 'Suppress all output.', negatable: false)
+        ..addFlag('verbose',
+            abbr: 'v', help: 'Show extra diagnostics.', negatable: false)
+        ..addFlag('raw',
+            help: 'Treat input as raw PCM (no header).', negatable: false)
         ..addOption(
           'sample-rate',
           help: 'Sample rate for raw PCM.',
@@ -88,7 +93,9 @@ Future<void> main(List<String> args) async {
           help: 'Number of channels for raw PCM.',
           defaultsTo: '2',
         )
-        ..addFlag('float', help: 'Treat raw PCM as IEEE float instead of integer.', negatable: false),
+        ..addFlag('float',
+            help: 'Treat raw PCM as IEEE float instead of integer.',
+            negatable: false),
     )
     ..addFlag('help', abbr: 'h', help: 'Show this help.', negatable: false)
     ..addFlag('version', help: 'Print the version and exit.', negatable: false);
@@ -138,7 +145,8 @@ Future<void> _runAnalyse(ArgResults cmd) async {
   final verbose = cmd['verbose'] as bool;
   final outputFormat = cmd['output'] as String;
   final sensitivityStr = cmd['sensitivity'] as String;
-  final minConfidence = _parseDouble(cmd['min-confidence'] as String, 'min-confidence');
+  final minConfidence =
+      _parseDouble(cmd['min-confidence'] as String, 'min-confidence');
   final threshold = _parseDouble(cmd['threshold'] as String, 'threshold');
   final isRaw = cmd['raw'] as bool;
   final isFloat = cmd['float'] as bool;
@@ -183,7 +191,8 @@ Future<void> _runAnalyse(ArgResults cmd) async {
   // Expand globs
   final filePaths = await _expandPaths(cmd.rest);
   if (filePaths.isEmpty) {
-    stderr.writeln('Error: no matching files found for: ${cmd.rest.join(', ')}');
+    stderr
+        .writeln('Error: no matching files found for: ${cmd.rest.join(', ')}');
     exit(_exitFileError);
   }
 
@@ -347,7 +356,8 @@ String _fmtDuration(Duration d) {
 double _parseDouble(String s, String argName) {
   final v = double.tryParse(s);
   if (v == null || v < 0.0 || v > 1.0) {
-    stderr.writeln('Error: --$argName must be a number between 0.0 and 1.0, got "$s"');
+    stderr.writeln(
+        'Error: --$argName must be a number between 0.0 and 1.0, got "$s"');
     exit(_exitUsageError);
   }
   return v;
@@ -368,7 +378,8 @@ Future<List<String>> _expandPaths(List<String> patterns) async {
     // Naive glob: only support trailing wildcard with a base directory
     final sep = Platform.pathSeparator;
     final idx = math.max(pattern.lastIndexOf('/'), pattern.lastIndexOf(sep));
-    final dir = idx < 0 ? Directory.current : Directory(pattern.substring(0, idx));
+    final dir =
+        idx < 0 ? Directory.current : Directory(pattern.substring(0, idx));
     final glob = idx < 0 ? pattern : pattern.substring(idx + 1);
     if (await dir.exists()) {
       await for (final entity in dir.list()) {
@@ -403,7 +414,8 @@ void _usage(ArgParser parser, [String? error]) {
     ..writeln('Examples:')
     ..writeln('  audiodefect analyse recording.wav')
     ..writeln('  audiodefect analyse recording.aiff')
-    ..writeln('  audiodefect analyse recording.raw --raw --sample-rate=48000 --bit-depth=24 --channels=1')
+    ..writeln(
+        '  audiodefect analyse recording.raw --raw --sample-rate=48000 --bit-depth=24 --channels=1')
     ..writeln()
     ..writeln('Options:')
     ..writeln(parser.usage);
