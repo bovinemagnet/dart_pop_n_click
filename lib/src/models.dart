@@ -66,11 +66,19 @@ class DetectorConfig {
 
 /// Technical metadata about the decoded audio stream.
 class AudioMetadata {
+  /// Sample rate in Hertz (e.g. 44100, 48000).
   final int sampleRate;
+
+  /// Sample bit depth (8, 16, 24, or 32).
   final int bitDepth;
+
+  /// Number of audio channels (1 = mono, 2 = stereo, …).
   final int channels;
+
+  /// Total playback duration of the audio.
   final Duration duration;
 
+  /// Creates an [AudioMetadata] record.
   const AudioMetadata({
     required this.sampleRate,
     required this.bitDepth,
@@ -111,6 +119,7 @@ class Defect {
   /// Normalised peak amplitude (–1.0 to 1.0) of the anomaly.
   final double amplitude;
 
+  /// Creates a [Defect] record.
   const Defect({
     required this.offset,
     required this.length,
@@ -121,6 +130,7 @@ class Defect {
     required this.amplitude,
   });
 
+  /// Serialise this defect to a JSON-compatible map.
   Map<String, dynamic> toJson() => {
         'offset_ms': offset.inMilliseconds,
         'length_ms': length.inMilliseconds,
@@ -154,12 +164,15 @@ class AnalysisResult {
   /// Technical metadata about the source audio.
   final AudioMetadata metadata;
 
+  /// Creates an [AnalysisResult] record.
   const AnalysisResult({
     required this.defects,
     required this.aggregateConfidence,
     required this.metadata,
   });
 
+  /// Serialise the full analysis result (including all defects and
+  /// metadata) to a JSON-compatible map with a schema version.
   Map<String, dynamic> toJson() => {
         'schema_version': '1',
         'aggregate_confidence': aggregateConfidence,
@@ -180,16 +193,26 @@ class AnalysisResult {
 
 /// Describes the layout of raw PCM audio data.
 class PcmFormat {
+  /// Sample rate in Hertz (e.g. 44100, 48000).
   final int sampleRate;
+
+  /// Sample bit depth (8, 16, 24, or 32).
   final int bitDepth;
+
+  /// Number of interleaved channels (1 = mono, 2 = stereo, …).
   final int channels;
+
+  /// True if samples are IEEE 754 floats (only valid for 32-bit).
   final bool isFloat;
+
+  /// Byte order of multi-byte samples. Defaults to [Endian.little].
   final Endian endian;
 
   /// Whether 8-bit samples are signed (AIFF) or unsigned (WAV).
   /// Only relevant when bitDepth == 8. Defaults to false (unsigned).
   final bool signed8bit;
 
+  /// Creates a [PcmFormat] descriptor.
   const PcmFormat({
     required this.sampleRate,
     required this.bitDepth,

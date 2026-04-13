@@ -113,12 +113,15 @@ WavData decodeWav(Uint8List bytes) {
 // WavData record
 // ---------------------------------------------------------------------------
 
+/// Result of decoding a WAV file: metadata plus per-channel normalised samples.
 class WavData {
+  /// Technical metadata extracted from the WAV header.
   final AudioMetadata metadata;
 
   /// One [Float32List] per channel.  Values are in the range \[-1.0, 1.0\].
   final List<Float32List> samples;
 
+  /// Creates a [WavData] record.
   const WavData({required this.metadata, required this.samples});
 }
 
