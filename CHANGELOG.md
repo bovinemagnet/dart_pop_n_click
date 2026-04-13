@@ -1,3 +1,7 @@
+## 0.0.3 (2026-04-13)
+
+- **Licence change:** relicensed from GPL-3.0 to Apache-2.0 (permissive, allows use in proprietary projects)
+
 ## 0.0.2 (2026-04-13)
 
 - **Breaking:** `analyseBytes()`, `analysePcm()`, and `analyseSamples()` are now synchronous — they return `AnalysisResult` directly instead of `Future<AnalysisResult>`. Only `analyseFile()` remains async (file I/O).
