@@ -6,7 +6,7 @@ import 'models.dart';
 
 /// Decode raw interleaved PCM [bytes] into normalised Float32 samples per channel.
 ///
-/// Returns one [Float32List] per channel, values in [-1.0, 1.0].
+/// Returns one [Float32List] per channel, values in \[-1.0, 1.0\].
 /// Throws [CorruptFileException] if byte length is not aligned to frame size.
 List<Float32List> decodePcmBytes(Uint8List bytes, PcmFormat format) {
   final frameSize = format.bytesPerFrame;

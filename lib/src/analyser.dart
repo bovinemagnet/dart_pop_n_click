@@ -81,7 +81,7 @@ AnalysisResult analysePcm(
   return _analyseSamples(channels, format.sampleRate, format, config);
 }
 
-/// Analyse pre-normalised [channelSamples] (values in [-1.0, 1.0]).
+/// Analyse pre-normalised [channelSamples] (values in \[-1.0, 1.0\]).
 ///
 /// The caller must provide a [sampleRate] so that defect offsets can be
 /// expressed in wall-clock time.
