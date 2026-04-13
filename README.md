@@ -5,6 +5,7 @@ Pure Dart library to detect pops and clicks in WAV audio files.
 ## Features
 
 - Detect clicks (1–10 samples) and pops (10–150 samples) in WAV and AIFF audio
+- Detects clipping (hard digital saturation), dropouts (brief digital silence), and DC offset
 - AIFF and AIFF-C format support (big-endian PCM, `sowt` little-endian variant)
 - Adaptive MAD-based threshold with configurable sensitivity
 - Support for PCM 8/16/24/32-bit and IEEE Float 32-bit WAV files
@@ -78,17 +79,27 @@ Analyses a `Uint8List` of audio bytes and returns a `Future<AnalysisResult>`.
 | `defects` | `List<Defect>` sorted by time offset. |
 | `aggregateConfidence` | Overall file-level defect probability (0.0–1.0). |
 | `metadata` | `AudioMetadata` (sample rate, bit depth, channels, duration). |
+| `dcOffsetPerChannel` | `List<double>` — per-channel mean sample bias (normalised to [-1.0, 1.0]). Values near 0.0 indicate no DC offset; larger magnitudes indicate a recording or decoder bias. |
 
 ### `Defect`
 | Field | Description |
 |---|---|
 | `offset` | `Duration` from the start of the file. |
 | `length` | `Duration` of the defect span. |
-| `type` | `DefectType.click` (1–10 samples) or `DefectType.pop` (10–150 samples). |
+| `type` | One of `DefectType.click`, `DefectType.pop`, `DefectType.clipping`, or `DefectType.dropout`. See [Defect Types](#defect-types). |
 | `confidence` | Score 0.0–1.0 derived from peak-to-noise ratio via logistic function. |
 | `channel` | Zero-based channel index. |
 | `sampleIndex` | Sample index of the peak anomaly. |
 | `amplitude` | Normalised peak amplitude (–1.0 to 1.0). |
+
+### Defect Types
+
+| Type | Description |
+|---|---|
+| `DefectType.click` | Sharp transient spanning 1–10 samples — typically an impulse-like disturbance. |
+| `DefectType.pop` | Wider transient spanning 10–150 samples — audible as a dull "pop". |
+| `DefectType.clipping` | A run of consecutive samples pinned at ±1.0, indicating hard digital saturation. |
+| `DefectType.dropout` | A brief, unexpected region of digital silence within audio content (e.g. a buffer underrun or decoder glitch). |
 
 ### Exceptions
 - `UnsupportedFormatException` — unsupported file format.

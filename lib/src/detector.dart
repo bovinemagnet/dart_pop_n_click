@@ -263,6 +263,159 @@ double computeAggregateConfidence(List<Defect> defects) {
 // Helpers
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Clipping detection
+// ---------------------------------------------------------------------------
+
+/// Detect regions where consecutive samples saturate at or near [threshold].
+///
+/// Returns one [Defect] per run of [minRun]+ consecutive clipped samples,
+/// per channel. Confidence scales with run length (caps at 1.0).
+List<Defect> detectClipping(
+  List<Float32List> channels,
+  int sampleRate, {
+  double threshold = 0.99,
+  int minRun = 3,
+}) {
+  final List<Defect> defects = [];
+  for (int ch = 0; ch < channels.length; ch++) {
+    final samples = channels[ch];
+    int runStart = -1;
+    double peak = 0.0;
+
+    void emit(int start, int endExclusive) {
+      final runLength = endExclusive - start;
+      if (runLength < minRun) return;
+      final offsetMs = (start / sampleRate * 1000).round();
+      final lengthMs =
+          math.max(1, (runLength / sampleRate * 1000).round());
+      defects.add(Defect(
+        offset: Duration(milliseconds: offsetMs),
+        length: Duration(milliseconds: lengthMs),
+        type: DefectType.clipping,
+        confidence: math.min(1.0, runLength / 10.0),
+        channel: ch,
+        sampleIndex: start,
+        amplitude: peak,
+      ));
+    }
+
+    for (int i = 0; i < samples.length; i++) {
+      final a = samples[i].abs();
+      if (a >= threshold) {
+        if (runStart < 0) {
+          runStart = i;
+          peak = a;
+        } else if (a > peak) {
+          peak = a;
+        }
+      } else if (runStart >= 0) {
+        emit(runStart, i);
+        runStart = -1;
+        peak = 0.0;
+      }
+    }
+    if (runStart >= 0) {
+      emit(runStart, samples.length);
+    }
+  }
+  return defects;
+}
+
+// ---------------------------------------------------------------------------
+// Dropout detection
+// ---------------------------------------------------------------------------
+
+/// Detect regions of unexpected digital silence surrounded by audio content.
+///
+/// A dropout is a run of samples below [silenceThreshold] whose length is
+/// between [minMs] and [maxMs] (inclusive) and that is bordered on both
+/// sides by non-silent samples. Runs at the very start or end of the
+/// signal are ignored (they could be intentional leading/trailing silence).
+List<Defect> detectDropouts(
+  List<Float32List> channels,
+  int sampleRate, {
+  double silenceThreshold = 1e-4,
+  double minMs = 1.0,
+  double maxMs = 50.0,
+}) {
+  if (channels.isEmpty) return [];
+  final mono = channels.length == 1 ? channels[0] : _sumToMono(channels);
+  final n = mono.length;
+  if (n < 3) return [];
+
+  final minSamples = math.max(1, (minMs * sampleRate / 1000).round());
+  final maxSamples = math.max(minSamples, (maxMs * sampleRate / 1000).round());
+
+  final List<Defect> defects = [];
+  int runStart = -1;
+  for (int i = 0; i < n; i++) {
+    final silent = mono[i].abs() < silenceThreshold;
+    if (silent) {
+      if (runStart < 0) runStart = i;
+    } else if (runStart >= 0) {
+      final runEnd = i; // exclusive
+      final runLength = runEnd - runStart;
+      if (runStart > 0 &&
+          runEnd < n &&
+          runLength >= minSamples &&
+          runLength <= maxSamples &&
+          mono[runStart - 1].abs() >= silenceThreshold &&
+          mono[runEnd].abs() >= silenceThreshold) {
+        // Compute surrounding RMS from a short window on either side
+        final winRadius = math.min(
+            sampleRate ~/ 100, math.min(runStart, n - runEnd));
+        double sumSq = 0.0;
+        int count = 0;
+        for (int k = math.max(0, runStart - winRadius); k < runStart; k++) {
+          sumSq += mono[k] * mono[k];
+          count++;
+        }
+        for (int k = runEnd;
+            k < math.min(n, runEnd + winRadius);
+            k++) {
+          sumSq += mono[k] * mono[k];
+          count++;
+        }
+        final rms = count > 0 ? math.sqrt(sumSq / count) : 0.0;
+        final confidence = math.min(1.0, rms * 10.0);
+
+        final offsetMs = (runStart / sampleRate * 1000).round();
+        final lengthMs =
+            math.max(1, (runLength / sampleRate * 1000).round());
+        defects.add(Defect(
+          offset: Duration(milliseconds: offsetMs),
+          length: Duration(milliseconds: lengthMs),
+          type: DefectType.dropout,
+          confidence: confidence,
+          channel: 0,
+          sampleIndex: runStart,
+          amplitude: 0.0,
+        ));
+      }
+      runStart = -1;
+    }
+  }
+  return defects;
+}
+
+// ---------------------------------------------------------------------------
+// DC offset
+// ---------------------------------------------------------------------------
+
+/// Compute per-channel DC offset (mean sample value). Returns a list with
+/// one entry per input channel.
+List<double> computeDcOffsets(List<Float32List> channels) {
+  return channels.map((ch) {
+    if (ch.isEmpty) return 0.0;
+    double sum = 0;
+    for (final s in ch) {
+      sum += s;
+    }
+    return sum / ch.length;
+  }).toList(growable: false);
+}
+
 Float32List _sumToMono(List<Float32List> channels) {
   if (channels.length == 1) return channels[0];
   final n = channels[0].length;

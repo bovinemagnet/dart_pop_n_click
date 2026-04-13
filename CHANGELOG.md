@@ -1,3 +1,11 @@
+## 0.1.0 (2026-04-13)
+
+- Clipping detection (`DefectType.clipping`) — flags runs of consecutive samples at ±1.0
+- Dropout detection (`DefectType.dropout`) — flags unexpected digital silence mid-audio
+- DC offset reporting — per-channel mean bias now included in `AnalysisResult.dcOffsetPerChannel`
+- New `DetectorConfig` thresholds: `clippingThreshold`, `clippingMinRun`, `dropoutSilenceThreshold`, `dropoutMinMs`, `dropoutMaxMs`, `dcOffsetThreshold`, and `detectClipping`/`detectDropouts`/`detectDcOffset` toggles
+- Closes #5, #6, #7
+
 ## 0.0.3 (2026-04-13)
 
 - **Licence change:** relicensed from GPL-3.0 to Apache-2.0 (permissive, allows use in proprietary projects)

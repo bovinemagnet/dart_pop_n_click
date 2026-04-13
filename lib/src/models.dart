@@ -14,6 +14,12 @@ enum DefectType {
 
   /// A slightly wider transient burst (10–150 samples).
   pop,
+
+  /// A run of consecutive samples saturated at or near full scale.
+  clipping,
+
+  /// A region of unexpected digital silence surrounded by audio content.
+  dropout,
 }
 
 /// Sensitivity preset controlling how aggressively the detector flags anomalies.
@@ -43,11 +49,47 @@ class DetectorConfig {
   /// before analysis.
   final bool perChannel;
 
+  /// Absolute sample magnitude considered clipping (default 0.99).
+  final double clippingThreshold;
+
+  /// Minimum consecutive clipped samples to flag as a defect (default 3).
+  final int clippingMinRun;
+
+  /// Absolute sample magnitude considered digital silence for dropout detection (default 1e-4).
+  final double dropoutSilenceThreshold;
+
+  /// Minimum dropout duration in milliseconds (default 1.0).
+  final double dropoutMinMs;
+
+  /// Maximum dropout duration in milliseconds; above this it is treated as intentional silence (default 50.0).
+  final double dropoutMaxMs;
+
+  /// Absolute mean value at which DC offset is reported (default 0.01).
+  final double dcOffsetThreshold;
+
+  /// Enable clipping detection (default true).
+  final bool detectClipping;
+
+  /// Enable dropout detection (default true).
+  final bool detectDropouts;
+
+  /// Enable DC offset detection (default true).
+  final bool detectDcOffset;
+
   const DetectorConfig({
     this.sensitivity = Sensitivity.medium,
     this.minConfidence = 0.0,
     this.maxDefects = 0,
     this.perChannel = false,
+    this.clippingThreshold = 0.99,
+    this.clippingMinRun = 3,
+    this.dropoutSilenceThreshold = 1e-4,
+    this.dropoutMinMs = 1.0,
+    this.dropoutMaxMs = 50.0,
+    this.dcOffsetThreshold = 0.01,
+    this.detectClipping = true,
+    this.detectDropouts = true,
+    this.detectDcOffset = true,
   });
 
   /// Returns the adaptive-threshold multiplier for the chosen sensitivity.
@@ -164,11 +206,17 @@ class AnalysisResult {
   /// Technical metadata about the source audio.
   final AudioMetadata metadata;
 
+  /// Per-channel DC offset (mean sample value). Values near zero indicate
+  /// no DC bias; one entry per input channel. Empty if DC offset detection
+  /// was disabled.
+  final List<double> dcOffsetPerChannel;
+
   /// Creates an [AnalysisResult] record.
   const AnalysisResult({
     required this.defects,
     required this.aggregateConfidence,
     required this.metadata,
+    this.dcOffsetPerChannel = const [],
   });
 
   /// Serialise the full analysis result (including all defects and
@@ -184,6 +232,7 @@ class AnalysisResult {
           'duration_ms': metadata.duration.inMilliseconds,
         },
         'defects': defects.map((d) => d.toJson()).toList(),
+        'dc_offset_per_channel': dcOffsetPerChannel,
       };
 }
 

@@ -408,6 +408,128 @@ void main() {
     });
   });
 
+  group('detectClipping', () {
+    test('short clipping run below minRun is ignored', () {
+      // 2 samples at 1.0, minRun = 3
+      final ch = Float32List.fromList([0.5, 1.0, 1.0, 0.5, 0.5]);
+      final defects = detectClipping([ch], 44100, minRun: 3);
+      expect(defects, isEmpty);
+    });
+
+    test('long clipping run detected', () {
+      // 5 samples at 1.0
+      final ch = Float32List.fromList([0.5, 1.0, 1.0, 1.0, 1.0, 1.0, 0.5]);
+      final defects = detectClipping([ch], 44100, minRun: 3);
+      expect(defects, isNotEmpty);
+      expect(defects.first.type, equals(DefectType.clipping));
+    });
+
+    test('negative clipping also detected', () {
+      final ch = Float32List.fromList([0, -1.0, -1.0, -1.0, -1.0, 0]);
+      final defects = detectClipping([ch], 44100, minRun: 3);
+      expect(defects, isNotEmpty);
+    });
+
+    test('borderline samples (0.98) not flagged by default', () {
+      final ch = Float32List.fromList([0.98, 0.98, 0.98, 0.98, 0.98]);
+      final defects = detectClipping([ch], 44100);
+      expect(defects, isEmpty);
+    });
+
+    test('clipping on one channel of stereo attributed correctly', () {
+      final left = Float32List.fromList([0, 0, 0, 0, 0]);
+      final right = Float32List.fromList([1.0, 1.0, 1.0, 1.0, 1.0]);
+      final defects = detectClipping([left, right], 44100);
+      expect(defects, isNotEmpty);
+      expect(defects.first.channel, equals(1));
+    });
+
+    test('confidence scales with run length', () {
+      final short = Float32List.fromList([1.0, 1.0, 1.0]);
+      final long = Float32List.fromList(List.filled(20, 1.0));
+      final shortDefects = detectClipping([short], 44100, minRun: 3);
+      final longDefects = detectClipping([long], 44100, minRun: 3);
+      expect(longDefects.first.confidence,
+          greaterThanOrEqualTo(shortDefects.first.confidence));
+    });
+  });
+
+  group('detectDropouts', () {
+    test('brief silence within audio detected as dropout', () {
+      // 1 second of sine wave at 44.1kHz with ~10ms silence in the middle
+      final n = 44100;
+      final samples = Float32List(n);
+      for (var i = 0; i < n; i++) {
+        samples[i] = 0.5 * math.sin(2 * math.pi * 440 * i / 44100);
+      }
+      // Inject 441 samples (~10ms) of silence in the middle
+      for (var i = 22000; i < 22441; i++) {
+        samples[i] = 0;
+      }
+      final defects = detectDropouts([samples], 44100);
+      expect(defects, isNotEmpty);
+      expect(defects.first.type, equals(DefectType.dropout));
+    });
+
+    test('silence at start of file not flagged', () {
+      final n = 44100;
+      final samples = Float32List(n);
+      // First 10ms silent, rest sine wave
+      for (var i = 441; i < n; i++) {
+        samples[i] = 0.5 * math.sin(2 * math.pi * 440 * i / 44100);
+      }
+      final defects = detectDropouts([samples], 44100);
+      expect(defects, isEmpty);
+    });
+
+    test('long silence (>50ms) not flagged as dropout', () {
+      final n = 44100;
+      final samples = Float32List(n);
+      for (var i = 0; i < n; i++) {
+        samples[i] = 0.5 * math.sin(2 * math.pi * 440 * i / 44100);
+      }
+      // Inject 100ms silence (4410 samples)
+      for (var i = 20000; i < 24410; i++) {
+        samples[i] = 0;
+      }
+      final defects = detectDropouts([samples], 44100);
+      expect(defects, isEmpty);
+    });
+
+    test('fully silent signal produces no dropouts', () {
+      final samples = Float32List(44100);
+      final defects = detectDropouts([samples], 44100);
+      expect(defects, isEmpty);
+    });
+  });
+
+  group('computeDcOffsets', () {
+    test('silent signal has zero DC offset', () {
+      final ch = Float32List(1000);
+      final offsets = computeDcOffsets([ch]);
+      expect(offsets, [0.0]);
+    });
+
+    test('signal shifted by +0.1 reports +0.1 offset', () {
+      final ch = Float32List.fromList(List.filled(1000, 0.1));
+      final offsets = computeDcOffsets([ch]);
+      expect(offsets[0], closeTo(0.1, 0.001));
+    });
+
+    test('per-channel offsets for stereo', () {
+      final left = Float32List.fromList(List.filled(100, 0.05));
+      final right = Float32List.fromList(List.filled(100, -0.1));
+      final offsets = computeDcOffsets([left, right]);
+      expect(offsets[0], closeTo(0.05, 0.001));
+      expect(offsets[1], closeTo(-0.1, 0.001));
+    });
+
+    test('empty channel produces 0.0', () {
+      final offsets = computeDcOffsets([Float32List(0)]);
+      expect(offsets, [0.0]);
+    });
+  });
+
   group('Defect model', () {
     test('toJson contains all required fields', () {
       final d = _fakeDefect(0.75);

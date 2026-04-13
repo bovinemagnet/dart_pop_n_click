@@ -26,7 +26,7 @@ models → pcm_decoder → wav_decoder → detector → analyser → CLI (bin/au
 - **`lib/src/models.dart`** — Data models (`DetectorConfig`, `Defect`, `AnalysisResult`, `AudioMetadata`), enums (`Sensitivity`, `DefectType`), and custom exceptions
 - **`lib/src/wav_decoder.dart`** — Pure-Dart RIFF/WAV parser supporting PCM 8/16/24/32-bit and IEEE Float 32-bit; normalises samples to `Float32List` in [-1.0, 1.0]
 - **`lib/src/aiff_decoder.dart`** — Pure-Dart AIFF/AIFF-C parser supporting big-endian PCM 8/16/24/32-bit and `sowt` little-endian variant; follows the same pattern as wav_decoder and delegates to pcm_decoder
-- **`lib/src/detector.dart`** — Core detection algorithm: high-pass differentiator → adaptive MAD threshold over ~10ms window → region merging → classification (click: 1–10 samples, pop: 10–150 samples) → logistic confidence scoring
+- **`lib/src/detector.dart`** — Core detection algorithm: high-pass differentiator → adaptive MAD threshold over ~10ms window → region merging → classification (click: 1–10 samples, pop: 10–150 samples) → logistic confidence scoring. Also detects clipping (runs of consecutive samples at ±1.0), dropouts (brief unexpected digital silence mid-audio), and reports per-channel DC offset via `AnalysisResult.dcOffsetPerChannel`.
 - **`lib/src/pcm_decoder.dart`** — Raw PCM byte normalisation, used by wav_decoder and available directly via `decodePcmBytes()`
 - **`lib/src/math_utils.dart`** — Public statistical utilities (`median`, `mad`) used by the detector and available to consumers
 - **`lib/src/analyser.dart`** — Async top-level API (`analyseFile()`, `analyseBytes()`, `analysePcm()`, `analyseSamples()`) that bridges decoder and detector with format auto-detection via magic bytes

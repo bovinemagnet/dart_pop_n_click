@@ -592,4 +592,79 @@ void main() {
       expect(result.metadata.channels, equals(1));
     });
   });
+
+  // -------------------------------------------------------------------------
+  // New defect types: clipping, dropout, DC offset
+  // -------------------------------------------------------------------------
+
+  group('AnalysisResult – new defect types', () {
+    test('clipping detected in WAV analysis', () async {
+      const sampleRate = 44100;
+      // 1 second of a moderate sine wave with a long run of clipped samples.
+      final floats = List<double>.generate(
+        sampleRate,
+        (i) => 0.3 * math.sin(2 * math.pi * 440 * i / sampleRate),
+      );
+      // Inject a run of samples saturated at full-scale (clipping).
+      for (var i = 10000; i < 10050; i++) {
+        floats[i] = 1.0;
+      }
+
+      final wav = buildWav16MonoFromFloats(floats, sampleRate: sampleRate);
+      final result = analyseBytes(
+        wav,
+        config: const DetectorConfig(sensitivity: Sensitivity.high),
+      );
+
+      expect(
+        result.defects.any((d) => d.type == DefectType.clipping),
+        isTrue,
+      );
+    });
+
+    test('dropout detected in analysePcm', () {
+      const sampleRate = 44100;
+      // Build 1 second of a sine wave, then inject ~10ms of silence mid-way.
+      final samples = List<int>.generate(
+        sampleRate,
+        (i) => (0.5 * math.sin(2 * math.pi * 440 * i / sampleRate) * 32767)
+            .round(),
+      );
+      for (var i = 22000; i < 22441; i++) {
+        samples[i] = 0;
+      }
+
+      final bytes = buildRawPcm16Mono(samples);
+      final format = PcmFormat(
+        sampleRate: sampleRate,
+        bitDepth: 16,
+        channels: 1,
+      );
+
+      final result = analysePcm(
+        bytes,
+        format: format,
+        config: const DetectorConfig(sensitivity: Sensitivity.high),
+      );
+
+      expect(
+        result.defects.any((d) => d.type == DefectType.dropout),
+        isTrue,
+      );
+    });
+
+    test('AnalysisResult includes dcOffsetPerChannel', () async {
+      const sampleRate = 44100;
+      final floats = List<double>.generate(
+        sampleRate,
+        (i) => 0.1 * math.sin(2 * math.pi * 440 * i / sampleRate),
+      );
+      final wav = buildWav16MonoFromFloats(floats, sampleRate: sampleRate);
+
+      final result = analyseBytes(wav);
+
+      expect(result.dcOffsetPerChannel, isNotNull);
+      expect(result.dcOffsetPerChannel.length, equals(1));
+    });
+  });
 }

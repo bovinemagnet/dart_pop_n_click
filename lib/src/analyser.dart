@@ -102,13 +102,7 @@ AnalysisResult analyseSamples(
     duration: Duration(milliseconds: durationMs),
   );
 
-  final defects = detectDefects(channelSamples, sampleRate, config);
-  final aggregate = computeAggregateConfidence(defects);
-  return AnalysisResult(
-    defects: defects,
-    aggregateConfidence: aggregate,
-    metadata: metadata,
-  );
+  return _buildResult(channelSamples, sampleRate, metadata, config);
 }
 
 AnalysisResult _analyseSamples(
@@ -127,12 +121,56 @@ AnalysisResult _analyseSamples(
     duration: Duration(milliseconds: durationMs),
   );
 
-  final defects = detectDefects(channels, sampleRate, config);
-  final aggregate = computeAggregateConfidence(defects);
+  return _buildResult(channels, sampleRate, metadata, config);
+}
+
+/// Shared analysis pipeline: run the pop/click detector plus any additional
+/// enabled detectors (clipping, dropouts, DC offset) and assemble the
+/// combined [AnalysisResult].
+AnalysisResult _buildResult(
+  List<Float32List> channels,
+  int sampleRate,
+  AudioMetadata metadata,
+  DetectorConfig config,
+) {
+  final List<Defect> allDefects = [
+    ...detectDefects(channels, sampleRate, config),
+  ];
+
+  if (config.detectClipping) {
+    allDefects.addAll(detectClipping(
+      channels,
+      sampleRate,
+      threshold: config.clippingThreshold,
+      minRun: config.clippingMinRun,
+    ));
+  }
+  if (config.detectDropouts) {
+    allDefects.addAll(detectDropouts(
+      channels,
+      sampleRate,
+      silenceThreshold: config.dropoutSilenceThreshold,
+      minMs: config.dropoutMinMs,
+      maxMs: config.dropoutMaxMs,
+    ));
+  }
+
+  allDefects.sort((a, b) => a.offset.compareTo(b.offset));
+
+  List<double> dcOffsets = const [];
+  if (config.detectDcOffset) {
+    final raw = computeDcOffsets(channels);
+    dcOffsets = raw
+        .map((v) => v.abs() >= config.dcOffsetThreshold ? v : 0.0)
+        .toList(growable: false);
+  }
+
+  final aggregate = computeAggregateConfidence(allDefects);
   return AnalysisResult(
-    defects: defects,
+    defects: allDefects,
     aggregateConfidence: aggregate,
     metadata: metadata,
+    dcOffsetPerChannel: dcOffsets,
   );
 }
 
@@ -183,26 +221,20 @@ _AudioFormat _detectFormat(Uint8List bytes, String? path) {
 
 AnalysisResult _analyseAiff(Uint8List bytes, DetectorConfig config) {
   final aiffData = decodeAiff(bytes);
-  final defects = detectDefects(aiffData.samples, aiffData.metadata.sampleRate, config);
-  final confidence = computeAggregateConfidence(defects);
-  return AnalysisResult(
-    defects: defects,
-    aggregateConfidence: confidence,
-    metadata: aiffData.metadata,
+  return _buildResult(
+    aiffData.samples,
+    aiffData.metadata.sampleRate,
+    aiffData.metadata,
+    config,
   );
 }
 
 AnalysisResult _analyseWav(Uint8List bytes, DetectorConfig config) {
   final wavData = decodeWav(bytes);
-  final defects = detectDefects(
+  return _buildResult(
     wavData.samples,
     wavData.metadata.sampleRate,
+    wavData.metadata,
     config,
-  );
-  final aggregate = computeAggregateConfidence(defects);
-  return AnalysisResult(
-    defects: defects,
-    aggregateConfidence: aggregate,
-    metadata: wavData.metadata,
   );
 }
