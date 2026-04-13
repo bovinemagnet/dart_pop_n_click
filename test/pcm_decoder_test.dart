@@ -269,10 +269,7 @@ void main() {
       test('zero normalises to 0.0', () {
         // 3 bytes big-endian: 0x00, 0x00, 0x00
         final format = PcmFormat(
-            sampleRate: 44100,
-            bitDepth: 24,
-            channels: 1,
-            endian: Endian.big);
+            sampleRate: 44100, bitDepth: 24, channels: 1, endian: Endian.big);
         final bytes = Uint8List.fromList([0x00, 0x00, 0x00]);
         final result = decodePcmBytes(bytes, format);
         expect(result[0][0], closeTo(0.0, 0.001));
@@ -281,10 +278,7 @@ void main() {
       test('max positive (0x7FFFFF) normalises to ~1.0', () {
         // Big-endian: 0x7F, 0xFF, 0xFF
         final format = PcmFormat(
-            sampleRate: 44100,
-            bitDepth: 24,
-            channels: 1,
-            endian: Endian.big);
+            sampleRate: 44100, bitDepth: 24, channels: 1, endian: Endian.big);
         final bytes = Uint8List.fromList([0x7F, 0xFF, 0xFF]);
         final result = decodePcmBytes(bytes, format);
         expect(result[0][0], closeTo(1.0, 0.001));
@@ -293,10 +287,7 @@ void main() {
       test('max negative sign-extends correctly', () {
         // Big-endian: 0x80, 0x00, 0x00 = -8388608
         final format = PcmFormat(
-            sampleRate: 44100,
-            bitDepth: 24,
-            channels: 1,
-            endian: Endian.big);
+            sampleRate: 44100, bitDepth: 24, channels: 1, endian: Endian.big);
         final bytes = Uint8List.fromList([0x80, 0x00, 0x00]);
         final result = decodePcmBytes(bytes, format);
         expect(result[0][0], closeTo(-1.0, 0.001));
@@ -308,8 +299,7 @@ void main() {
     // -------------------------------------------------------------------
     group('unsupported bit depth', () {
       test('bitDepth 12 throws UnsupportedFormatException', () {
-        final format =
-            PcmFormat(sampleRate: 44100, bitDepth: 12, channels: 1);
+        final format = PcmFormat(sampleRate: 44100, bitDepth: 12, channels: 1);
         // bytesPerSample for bitDepth 12 would be 12 ~/ 8 = 1
         final bytes = Uint8List(1);
         expect(() => decodePcmBytes(bytes, format),
@@ -317,8 +307,7 @@ void main() {
       });
 
       test('bitDepth 20 throws UnsupportedFormatException', () {
-        final format =
-            PcmFormat(sampleRate: 44100, bitDepth: 20, channels: 1);
+        final format = PcmFormat(sampleRate: 44100, bitDepth: 20, channels: 1);
         // bytesPerSample = 20 ~/ 8 = 2, need 2 bytes to be frame-aligned
         final bytes = Uint8List(2);
         expect(() => decodePcmBytes(bytes, format),
@@ -332,27 +321,20 @@ void main() {
     group('32-bit IEEE float edge cases', () {
       test('NaN is clamped to valid range', () {
         final format = PcmFormat(
-            sampleRate: 44100,
-            bitDepth: 32,
-            channels: 1,
-            isFloat: true);
+            sampleRate: 44100, bitDepth: 32, channels: 1, isFloat: true);
         final bd = ByteData(4);
         bd.setFloat32(0, double.nan, Endian.little);
         final bytes = bd.buffer.asUint8List();
         final result = decodePcmBytes(bytes, format);
         // NaN.clamp returns NaN in Dart — check the actual behaviour
         expect(
-            result[0][0].isNaN ||
-                (result[0][0] >= -1.0 && result[0][0] <= 1.0),
+            result[0][0].isNaN || (result[0][0] >= -1.0 && result[0][0] <= 1.0),
             isTrue);
       });
 
       test('positive infinity is clamped to 1.0', () {
         final format = PcmFormat(
-            sampleRate: 44100,
-            bitDepth: 32,
-            channels: 1,
-            isFloat: true);
+            sampleRate: 44100, bitDepth: 32, channels: 1, isFloat: true);
         final bd = ByteData(4);
         bd.setFloat32(0, double.infinity, Endian.little);
         final bytes = bd.buffer.asUint8List();
@@ -362,10 +344,7 @@ void main() {
 
       test('negative infinity is clamped to -1.0', () {
         final format = PcmFormat(
-            sampleRate: 44100,
-            bitDepth: 32,
-            channels: 1,
-            isFloat: true);
+            sampleRate: 44100, bitDepth: 32, channels: 1, isFloat: true);
         final bd = ByteData(4);
         bd.setFloat32(0, double.negativeInfinity, Endian.little);
         final bytes = bd.buffer.asUint8List();
@@ -410,30 +389,37 @@ void main() {
     // -------------------------------------------------------------------
     group('8-bit signed (signed8bit: true)', () {
       test('0 normalises to 0.0', () {
-        final format = PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
+        final format = PcmFormat(
+            sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
         final bytes = Uint8List.fromList([0]);
         final result = decodePcmBytes(bytes, format);
         expect(result[0][0], closeTo(0.0, 0.01));
       });
 
       test('127 normalises to ~1.0', () {
-        final format = PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
+        final format = PcmFormat(
+            sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
         final bytes = Uint8List.fromList([127]);
         final result = decodePcmBytes(bytes, format);
         expect(result[0][0], closeTo(127 / 128.0, 0.01));
       });
 
       test('0x80 (-128 signed) normalises to -1.0', () {
-        final format = PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
+        final format = PcmFormat(
+            sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
         final bytes = Uint8List.fromList([0x80]);
         final result = decodePcmBytes(bytes, format);
         expect(result[0][0], closeTo(-1.0, 0.01));
       });
 
-      test('unsigned vs signed 8-bit produce different results for same byte', () {
-        final unsignedFmt = PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: false);
-        final signedFmt = PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
-        final bytes = Uint8List.fromList([200]); // unsigned: (200-128)/128=0.5625, signed: -56/128=-0.4375
+      test('unsigned vs signed 8-bit produce different results for same byte',
+          () {
+        final unsignedFmt = PcmFormat(
+            sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: false);
+        final signedFmt = PcmFormat(
+            sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
+        final bytes = Uint8List.fromList(
+            [200]); // unsigned: (200-128)/128=0.5625, signed: -56/128=-0.4375
         final unsigned = decodePcmBytes(bytes, unsignedFmt);
         final signed = decodePcmBytes(bytes, signedFmt);
         expect(unsigned[0][0], isNot(closeTo(signed[0][0], 0.01)));

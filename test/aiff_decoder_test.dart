@@ -296,7 +296,8 @@ void main() {
       test('zero normalises to 0.0', () {
         final pcm = ByteData(4);
         pcm.setInt32(0, 0, Endian.big);
-        final aiff = buildAiff(channels: 1, bitDepth: 32, pcmData: pcm.buffer.asUint8List());
+        final aiff = buildAiff(
+            channels: 1, bitDepth: 32, pcmData: pcm.buffer.asUint8List());
         final result = decodeAiff(aiff);
         expect(result.samples[0][0], closeTo(0.0, 0.001));
       });
@@ -304,7 +305,8 @@ void main() {
       test('max positive normalises to ~1.0', () {
         final pcm = ByteData(4);
         pcm.setInt32(0, 2147483647, Endian.big);
-        final aiff = buildAiff(channels: 1, bitDepth: 32, pcmData: pcm.buffer.asUint8List());
+        final aiff = buildAiff(
+            channels: 1, bitDepth: 32, pcmData: pcm.buffer.asUint8List());
         final result = decodeAiff(aiff);
         expect(result.samples[0][0], closeTo(1.0, 0.001));
       });
@@ -312,7 +314,8 @@ void main() {
       test('max negative normalises to -1.0', () {
         final pcm = ByteData(4);
         pcm.setInt32(0, -2147483648, Endian.big);
-        final aiff = buildAiff(channels: 1, bitDepth: 32, pcmData: pcm.buffer.asUint8List());
+        final aiff = buildAiff(
+            channels: 1, bitDepth: 32, pcmData: pcm.buffer.asUint8List());
         final result = decodeAiff(aiff);
         expect(result.samples[0][0], closeTo(-1.0, 0.001));
       });
@@ -375,16 +378,16 @@ void main() {
     group('sample rate parsing', () {
       test('decodes 48000 Hz correctly', () {
         final pcm = Uint8List(2); // 1 frame of 16-bit silence
-        final aiff =
-            buildAiff(channels: 1, bitDepth: 16, sampleRate: 48000, pcmData: pcm);
+        final aiff = buildAiff(
+            channels: 1, bitDepth: 16, sampleRate: 48000, pcmData: pcm);
         final result = decodeAiff(aiff);
         expect(result.metadata.sampleRate, equals(48000));
       });
 
       test('decodes 8000 Hz correctly', () {
         final pcm = Uint8List(2);
-        final aiff =
-            buildAiff(channels: 1, bitDepth: 16, sampleRate: 8000, pcmData: pcm);
+        final aiff = buildAiff(
+            channels: 1, bitDepth: 16, sampleRate: 8000, pcmData: pcm);
         final result = decodeAiff(aiff);
         expect(result.metadata.sampleRate, equals(8000));
       });

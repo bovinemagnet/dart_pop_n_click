@@ -26,8 +26,7 @@ WavData decodeWav(Uint8List bytes) {
   reader.skip(4); // chunk size (ignored – we use the data chunk size instead)
   final waveTag = reader.readFourCC();
   if (waveTag != 'WAVE') {
-    throw CorruptFileException(
-        'Expected WAVE tag but found "$waveTag".');
+    throw CorruptFileException('Expected WAVE tag but found "$waveTag".');
   }
 
   // ---- Sub-chunks -----------------------------------------------------------
@@ -50,7 +49,8 @@ WavData decodeWav(Uint8List bytes) {
     switch (chunkId) {
       case 'fmt ':
         if (chunkSize < 16) {
-          throw CorruptFileException('fmt chunk is too small ($chunkSize bytes).');
+          throw CorruptFileException(
+              'fmt chunk is too small ($chunkSize bytes).');
         }
         audioFormat = reader.readUint16Le();
         channels = reader.readUint16Le();
@@ -95,8 +95,7 @@ WavData decodeWav(Uint8List bytes) {
   );
   final channelSamples = decodePcmBytes(pcmData, pcmFormat);
 
-  final totalFrames =
-      channelSamples.isEmpty ? 0 : channelSamples[0].length;
+  final totalFrames = channelSamples.isEmpty ? 0 : channelSamples[0].length;
   final durationMs = (totalFrames / sampleRate * 1000).round();
 
   final metadata = AudioMetadata(

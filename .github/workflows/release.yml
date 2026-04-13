@@ -1,0 +1,70 @@
+name: Release binaries
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build:
+    name: Build ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            target: linux-x64
+            ext: ''
+          - os: macos-latest
+            target: macos-arm64
+            ext: ''
+          - os: windows-latest
+            target: windows-x64
+            ext: '.exe'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dart-lang/setup-dart@v1
+        with:
+          sdk: stable
+      - run: dart pub get
+      - name: Compile audiodefect
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          EXT: ${{ matrix.ext }}
+        run: |
+          mkdir -p dist
+          dart compile exe bin/audiodefect.dart -o "dist/audiodefect-${TARGET}${EXT}"
+      - name: Package archive
+        shell: bash
+        env:
+          TARGET: ${{ matrix.target }}
+          EXT: ${{ matrix.ext }}
+          RUNNER_OS: ${{ runner.os }}
+        run: |
+          cd dist
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            7z a "audiodefect-${TARGET}.zip" "audiodefect-${TARGET}${EXT}"
+          else
+            tar czf "audiodefect-${TARGET}.tar.gz" "audiodefect-${TARGET}${EXT}"
+          fi
+      - uses: actions/upload-artifact@v4
+        with:
+          name: audiodefect-${{ matrix.target }}
+          path: dist/audiodefect-${{ matrix.target }}.*
+
+  release:
+    name: Attach to GitHub release
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*

@@ -307,6 +307,7 @@ class IoException implements Exception {
   const IoException(this.message, [this.cause]);
 
   @override
-  String toString() =>
-      cause == null ? 'IoException: $message' : 'IoException: $message ($cause)';
+  String toString() => cause == null
+      ? 'IoException: $message'
+      : 'IoException: $message ($cause)';
 }

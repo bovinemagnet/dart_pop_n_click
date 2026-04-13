@@ -88,30 +88,49 @@ File createTestAiff(List<int> samples, {int sampleRate = 44100}) {
   var offset = 0;
 
   // FORM header
-  for (final c in 'FORM'.codeUnits) { bd.setUint8(offset++, c); }
-  bd.setUint32(offset, formSize, Endian.big); offset += 4;
-  for (final c in 'AIFF'.codeUnits) { bd.setUint8(offset++, c); }
+  for (final c in 'FORM'.codeUnits) {
+    bd.setUint8(offset++, c);
+  }
+  bd.setUint32(offset, formSize, Endian.big);
+  offset += 4;
+  for (final c in 'AIFF'.codeUnits) {
+    bd.setUint8(offset++, c);
+  }
 
   // COMM chunk
-  for (final c in 'COMM'.codeUnits) { bd.setUint8(offset++, c); }
-  bd.setUint32(offset, commChunkSize, Endian.big); offset += 4;
-  bd.setInt16(offset, 1, Endian.big); offset += 2; // channels
-  bd.setUint32(offset, numSamples, Endian.big); offset += 4; // numFrames
-  bd.setInt16(offset, 16, Endian.big); offset += 2; // bitDepth
+  for (final c in 'COMM'.codeUnits) {
+    bd.setUint8(offset++, c);
+  }
+  bd.setUint32(offset, commChunkSize, Endian.big);
+  offset += 4;
+  bd.setInt16(offset, 1, Endian.big);
+  offset += 2; // channels
+  bd.setUint32(offset, numSamples, Endian.big);
+  offset += 4; // numFrames
+  bd.setInt16(offset, 16, Endian.big);
+  offset += 2; // bitDepth
   // 80-bit extended for 44100: exponent=0x400E, mantissa=0xAC44000000000000
   bd.setUint8(offset++, 0x40);
   bd.setUint8(offset++, 0x0E);
   bd.setUint8(offset++, 0xAC);
   bd.setUint8(offset++, 0x44);
-  for (var i = 0; i < 6; i++) { bd.setUint8(offset++, 0); }
+  for (var i = 0; i < 6; i++) {
+    bd.setUint8(offset++, 0);
+  }
 
   // SSND chunk
-  for (final c in 'SSND'.codeUnits) { bd.setUint8(offset++, c); }
-  bd.setUint32(offset, ssndChunkSize, Endian.big); offset += 4;
-  bd.setUint32(offset, 0, Endian.big); offset += 4; // data offset
-  bd.setUint32(offset, 0, Endian.big); offset += 4; // blockSize
+  for (final c in 'SSND'.codeUnits) {
+    bd.setUint8(offset++, c);
+  }
+  bd.setUint32(offset, ssndChunkSize, Endian.big);
+  offset += 4;
+  bd.setUint32(offset, 0, Endian.big);
+  offset += 4; // data offset
+  bd.setUint32(offset, 0, Endian.big);
+  offset += 4; // blockSize
   for (var i = 0; i < numSamples; i++) {
-    bd.setInt16(offset, samples[i], Endian.big); offset += 2;
+    bd.setInt16(offset, samples[i], Endian.big);
+    offset += 2;
   }
 
   final tmpDir = Directory.systemTemp.createTempSync('cli_aiff_test_');
@@ -200,8 +219,7 @@ void main() {
     });
 
     test('non-existent file exits 3', () async {
-      final result =
-          await runCli(['analyse', '/tmp/nonexistent_file_xyz.wav']);
+      final result = await runCli(['analyse', '/tmp/nonexistent_file_xyz.wav']);
       expect(result.exitCode, equals(3));
     });
 
@@ -297,8 +315,7 @@ void main() {
     test('--verbose includes extra diagnostics', () async {
       final file = createTestWav(List.filled(44100, 0));
       try {
-        final result =
-            await runCli(['analyse', file.path, '--verbose']);
+        final result = await runCli(['analyse', file.path, '--verbose']);
         expect(result.exitCode, equals(0));
         // Verbose writes diagnostics to stderr.
         expect(result.stderr.toString(), contains('Analysing'));
@@ -430,8 +447,7 @@ void main() {
     test('invalid --output value exits 2', () async {
       final file = createTestWav(List.filled(100, 0));
       try {
-        final result =
-            await runCli(['analyse', file.path, '--output=xml']);
+        final result = await runCli(['analyse', file.path, '--output=xml']);
         expect(result.exitCode, equals(2));
       } finally {
         file.parent.deleteSync(recursive: true);
@@ -441,8 +457,7 @@ void main() {
     test('--threshold out of range exits 2', () async {
       final file = createTestWav(List.filled(100, 0));
       try {
-        final result =
-            await runCli(['analyse', file.path, '--threshold=5.0']);
+        final result = await runCli(['analyse', file.path, '--threshold=5.0']);
         expect(result.exitCode, equals(2));
       } finally {
         file.parent.deleteSync(recursive: true);

@@ -91,8 +91,7 @@ AnalysisResult analyseSamples(
   int bitDepth = 16,
   DetectorConfig config = const DetectorConfig(),
 }) {
-  final totalFrames =
-      channelSamples.isEmpty ? 0 : channelSamples[0].length;
+  final totalFrames = channelSamples.isEmpty ? 0 : channelSamples[0].length;
   final durationMs =
       sampleRate > 0 ? (totalFrames / sampleRate * 1000).round() : 0;
   final metadata = AudioMetadata(
@@ -194,9 +193,18 @@ _AudioFormat _detectFormat(Uint8List bytes, String? path) {
     if (isRiff && isWave) return _AudioFormat.wav;
 
     // AIFF: "FORM" at 0-3, "AIFF" or "AIFC" at 8-11
-    if (bytes[0] == 0x46 && bytes[1] == 0x4F && bytes[2] == 0x52 && bytes[3] == 0x4D) {
-      if ((bytes[8] == 0x41 && bytes[9] == 0x49 && bytes[10] == 0x46 && bytes[11] == 0x46) ||
-          (bytes[8] == 0x41 && bytes[9] == 0x49 && bytes[10] == 0x46 && bytes[11] == 0x43)) {
+    if (bytes[0] == 0x46 &&
+        bytes[1] == 0x4F &&
+        bytes[2] == 0x52 &&
+        bytes[3] == 0x4D) {
+      if ((bytes[8] == 0x41 &&
+              bytes[9] == 0x49 &&
+              bytes[10] == 0x46 &&
+              bytes[11] == 0x46) ||
+          (bytes[8] == 0x41 &&
+              bytes[9] == 0x49 &&
+              bytes[10] == 0x46 &&
+              bytes[11] == 0x43)) {
         return _AudioFormat.aiff;
       }
     }

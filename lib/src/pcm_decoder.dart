@@ -106,8 +106,7 @@ void _decodeFloat(
 
   for (int frame = 0; frame < totalFrames; frame++) {
     for (int ch = 0; ch < channels; ch++) {
-      out[ch][frame] =
-          byteData.getFloat32(byteOffset, endian).clamp(-1.0, 1.0);
+      out[ch][frame] = byteData.getFloat32(byteOffset, endian).clamp(-1.0, 1.0);
       byteOffset += 4;
     }
   }

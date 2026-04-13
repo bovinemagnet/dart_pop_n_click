@@ -54,8 +54,7 @@ List<Defect> detectDefects(
 ) {
   final List<Defect> allDefects = [];
 
-  final channelsToProcess =
-      config.perChannel ? channelSamples.length : 1;
+  final channelsToProcess = config.perChannel ? channelSamples.length : 1;
 
   for (int ch = 0; ch < channelsToProcess; ch++) {
     final Float32List mono;
@@ -75,9 +74,7 @@ List<Defect> detectDefects(
 
   // Apply minConfidence filter
   final filtered = config.minConfidence > 0
-      ? allDefects
-          .where((d) => d.confidence >= config.minConfidence)
-          .toList()
+      ? allDefects.where((d) => d.confidence >= config.minConfidence).toList()
       : allDefects;
 
   // Apply maxDefects limit
@@ -108,7 +105,8 @@ List<Defect> _detectOnChannel(
   // Step 2: adaptive MAD threshold
   // Window size: ~10 ms worth of samples, minimum 128
   final windowSize = math.max(128, sampleRate ~/ 100);
-  final threshold = _buildAdaptiveThreshold(diff, windowSize, config.thresholdMultiplier);
+  final threshold =
+      _buildAdaptiveThreshold(diff, windowSize, config.thresholdMultiplier);
 
   // Step 3: flag samples
   final flagged = List<bool>.filled(samples.length, false);
@@ -239,7 +237,8 @@ double _logisticConfidence(double peakDiff, double localNoise) {
   if (localNoise <= 0) return 1.0;
   final ratio = peakDiff / localNoise;
   // Sigmoid centred at ratio = _kLogisticCentre, scaled so ratio ≈ 20 → 0.99
-  final score = 1.0 / (1.0 + math.exp(-(ratio - _kLogisticCentre) / _kLogisticScale));
+  final score =
+      1.0 / (1.0 + math.exp(-(ratio - _kLogisticCentre) / _kLogisticScale));
   return score.clamp(0.0, 1.0);
 }
 
@@ -287,8 +286,7 @@ List<Defect> detectClipping(
       final runLength = endExclusive - start;
       if (runLength < minRun) return;
       final offsetMs = (start / sampleRate * 1000).round();
-      final lengthMs =
-          math.max(1, (runLength / sampleRate * 1000).round());
+      final lengthMs = math.max(1, (runLength / sampleRate * 1000).round());
       defects.add(Defect(
         offset: Duration(milliseconds: offsetMs),
         length: Duration(milliseconds: lengthMs),
@@ -363,17 +361,15 @@ List<Defect> detectDropouts(
           mono[runStart - 1].abs() >= silenceThreshold &&
           mono[runEnd].abs() >= silenceThreshold) {
         // Compute surrounding RMS from a short window on either side
-        final winRadius = math.min(
-            sampleRate ~/ 100, math.min(runStart, n - runEnd));
+        final winRadius =
+            math.min(sampleRate ~/ 100, math.min(runStart, n - runEnd));
         double sumSq = 0.0;
         int count = 0;
         for (int k = math.max(0, runStart - winRadius); k < runStart; k++) {
           sumSq += mono[k] * mono[k];
           count++;
         }
-        for (int k = runEnd;
-            k < math.min(n, runEnd + winRadius);
-            k++) {
+        for (int k = runEnd; k < math.min(n, runEnd + winRadius); k++) {
           sumSq += mono[k] * mono[k];
           count++;
         }
@@ -381,8 +377,7 @@ List<Defect> detectDropouts(
         final confidence = math.min(1.0, rms * 10.0);
 
         final offsetMs = (runStart / sampleRate * 1000).round();
-        final lengthMs =
-            math.max(1, (runLength / sampleRate * 1000).round());
+        final lengthMs = math.max(1, (runLength / sampleRate * 1000).round());
         defects.add(Defect(
           offset: Duration(milliseconds: offsetMs),
           length: Duration(milliseconds: lengthMs),

@@ -29,7 +29,8 @@ void injectClick(Float32List buf, int pos, {double amplitude = 0.9}) {
 /// Inject a pop at [pos] as a damped alternating oscillation spanning [width] samples.
 /// This creates large differentiator values throughout the region so all samples
 /// are flagged and merge into a single wide region classified as a pop.
-void injectPop(Float32List buf, int pos, {int width = 50, double amplitude = 0.8}) {
+void injectPop(Float32List buf, int pos,
+    {int width = 50, double amplitude = 0.8}) {
   for (int i = 0; i < width; i++) {
     if (pos + i >= buf.length) break;
     final decay = math.exp(-3.0 * i / width);
@@ -80,7 +81,8 @@ void main() {
       injectClick(buf, 5000, amplitude: 0.99);
       final defects = detectDefects([buf], sampleRate, highConfig);
       expect(
-        defects.any((d) => d.type == DefectType.click && (d.sampleIndex - 5000).abs() < 50),
+        defects.any((d) =>
+            d.type == DefectType.click && (d.sampleIndex - 5000).abs() < 50),
         isTrue,
       );
     });
@@ -114,7 +116,8 @@ void main() {
       injectPop(buf, 15000, width: 80, amplitude: 0.97);
       final defects = detectDefects([buf], sampleRate, highConfig);
       expect(
-        defects.any((d) => d.type == DefectType.pop && (d.sampleIndex - 15000).abs() < 150),
+        defects.any((d) =>
+            d.type == DefectType.pop && (d.sampleIndex - 15000).abs() < 150),
         isTrue,
       );
     });
@@ -293,14 +296,18 @@ void main() {
 
   group('detectDefects – edge cases', () {
     test('single-sample buffer returns empty list', () {
-      final samples = [Float32List.fromList([0.5])];
+      final samples = [
+        Float32List.fromList([0.5])
+      ];
       final config = DetectorConfig();
       final defects = detectDefects(samples, 44100, config);
       expect(defects, isEmpty);
     });
 
     test('two-sample buffer does not crash', () {
-      final samples = [Float32List.fromList([0.0, 1.0])];
+      final samples = [
+        Float32List.fromList([0.0, 1.0])
+      ];
       final config = DetectorConfig();
       final defects = detectDefects(samples, 44100, config);
       // May or may not detect defect, but should not crash
@@ -320,7 +327,8 @@ void main() {
       // Channel 0 has 1000 samples, channel 1 has 500
       final ch0 = Float32List(1000);
       final ch1 = Float32List(500);
-      final config = DetectorConfig(); // perChannel defaults to false, so _sumToMono is called
+      final config =
+          DetectorConfig(); // perChannel defaults to false, so _sumToMono is called
       expect(
         () => detectDefects([ch0, ch1], sampleRate, config),
         throwsA(isA<StateError>()),

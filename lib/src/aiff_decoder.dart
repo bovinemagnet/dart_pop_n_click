@@ -109,8 +109,7 @@ AiffData decodeAiff(Uint8List bytes) {
     throw CorruptFileException('AIFF SSND chunk not found.');
   }
   if (bitDepth != 8 && bitDepth != 16 && bitDepth != 24 && bitDepth != 32) {
-    throw UnsupportedFormatException(
-        'Unsupported AIFF bit depth: $bitDepth.');
+    throw UnsupportedFormatException('Unsupported AIFF bit depth: $bitDepth.');
   }
 
   // ---- Determine endianness ------------------------------------------------
@@ -135,8 +134,7 @@ AiffData decodeAiff(Uint8List bytes) {
   );
   final channelSamples = decodePcmBytes(ssndData, pcmFormat);
 
-  final totalFrames =
-      channelSamples.isEmpty ? 0 : channelSamples[0].length;
+  final totalFrames = channelSamples.isEmpty ? 0 : channelSamples[0].length;
   final durationMs = (totalFrames / sampleRate * 1000).round();
 
   final metadata = AudioMetadata(
@@ -176,8 +174,8 @@ double _readExtended(Uint8List data) {
 
   // Reconstruct as a double: hi * 2^32 + lo, then divide by 2^63.
   // This avoids signed 64-bit integer issues entirely.
-  final mantissaDouble =
-      (hi & 0xFFFFFFFF).toDouble() * 4294967296.0 + (lo & 0xFFFFFFFF).toDouble();
+  final mantissaDouble = (hi & 0xFFFFFFFF).toDouble() * 4294967296.0 +
+      (lo & 0xFFFFFFFF).toDouble();
   // 2^63 as a double literal
   const twoTo63 = 9223372036854775808.0;
   final f = mantissaDouble / twoTo63 * math.pow(2, exponent - 16383);

@@ -89,16 +89,33 @@ void main() {
 
   group('PcmFormat', () {
     test('bytesPerSample is bitDepth ~/ 8', () {
-      expect(PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1).bytesPerSample, equals(1));
-      expect(PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 1).bytesPerSample, equals(2));
-      expect(PcmFormat(sampleRate: 44100, bitDepth: 24, channels: 1).bytesPerSample, equals(3));
-      expect(PcmFormat(sampleRate: 44100, bitDepth: 32, channels: 1).bytesPerSample, equals(4));
+      expect(
+          PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1).bytesPerSample,
+          equals(1));
+      expect(
+          PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 1)
+              .bytesPerSample,
+          equals(2));
+      expect(
+          PcmFormat(sampleRate: 44100, bitDepth: 24, channels: 1)
+              .bytesPerSample,
+          equals(3));
+      expect(
+          PcmFormat(sampleRate: 44100, bitDepth: 32, channels: 1)
+              .bytesPerSample,
+          equals(4));
     });
 
     test('bytesPerFrame is bytesPerSample * channels', () {
-      expect(PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 1).bytesPerFrame, equals(2));
-      expect(PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 2).bytesPerFrame, equals(4));
-      expect(PcmFormat(sampleRate: 44100, bitDepth: 24, channels: 6).bytesPerFrame, equals(18));
+      expect(
+          PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 1).bytesPerFrame,
+          equals(2));
+      expect(
+          PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 2).bytesPerFrame,
+          equals(4));
+      expect(
+          PcmFormat(sampleRate: 44100, bitDepth: 24, channels: 6).bytesPerFrame,
+          equals(18));
     });
 
     test('signed8bit defaults to false', () {
@@ -107,7 +124,8 @@ void main() {
     });
 
     test('signed8bit can be set to true', () {
-      final fmt = PcmFormat(sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
+      final fmt = PcmFormat(
+          sampleRate: 44100, bitDepth: 8, channels: 1, signed8bit: true);
       expect(fmt.signed8bit, isTrue);
     });
   });

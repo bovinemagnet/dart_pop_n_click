@@ -402,8 +402,19 @@ void main() {
         'file with .wav extension but invalid magic bytes throws UnsupportedFormatException or CorruptFileException',
         () {
       final bytes = Uint8List.fromList([
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
-        0x0B, 0x0C,
+        0x00,
+        0x01,
+        0x02,
+        0x03,
+        0x04,
+        0x05,
+        0x06,
+        0x07,
+        0x08,
+        0x09,
+        0x0A,
+        0x0B,
+        0x0C,
       ]);
       expect(
         () => analyseBytes(bytes, path: 'test.wav'),
@@ -416,8 +427,19 @@ void main() {
         'file with unknown extension and no valid magic bytes throws UnsupportedFormatException',
         () {
       final bytes = Uint8List.fromList([
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
-        0x0B, 0x0C,
+        0x00,
+        0x01,
+        0x02,
+        0x03,
+        0x04,
+        0x05,
+        0x06,
+        0x07,
+        0x08,
+        0x09,
+        0x0A,
+        0x0B,
+        0x0C,
       ]);
       expect(
         () => analyseBytes(bytes, path: 'test.xyz'),
@@ -428,8 +450,19 @@ void main() {
     test('no path and no valid magic bytes throws UnsupportedFormatException',
         () {
       final bytes = Uint8List.fromList([
-        0x00, 0x01, 0x02, 0x03, 0x04, 0x05, 0x06, 0x07, 0x08, 0x09, 0x0A,
-        0x0B, 0x0C,
+        0x00,
+        0x01,
+        0x02,
+        0x03,
+        0x04,
+        0x05,
+        0x06,
+        0x07,
+        0x08,
+        0x09,
+        0x0A,
+        0x0B,
+        0x0C,
       ]);
       expect(
         () => analyseBytes(bytes),
@@ -437,11 +470,9 @@ void main() {
       );
     });
 
-    test(
-        'bytes shorter than 12 with no path throws UnsupportedFormatException',
+    test('bytes shorter than 12 with no path throws UnsupportedFormatException',
         () {
-      final bytes =
-          Uint8List.fromList([0x52, 0x49, 0x46, 0x46]); // Just "RIFF"
+      final bytes = Uint8List.fromList([0x52, 0x49, 0x46, 0x46]); // Just "RIFF"
       expect(
         () => analyseBytes(bytes),
         throwsA(isA<UnsupportedFormatException>()),
@@ -456,8 +487,7 @@ void main() {
   group('analysePcm() – validation', () {
     test('misaligned bytes throws CorruptFileException', () {
       // 16-bit stereo needs 4 bytes per frame; 5 bytes is misaligned
-      final format =
-          PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 2);
+      final format = PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 2);
       final bytes = Uint8List(5);
       expect(
         () => analysePcm(bytes, format: format),
@@ -466,8 +496,7 @@ void main() {
     });
 
     test('empty bytes returns no defects', () async {
-      final format =
-          PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 1);
+      final format = PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 1);
       final bytes = Uint8List(0);
       final result = analysePcm(bytes, format: format);
       expect(result.defects, isEmpty);
@@ -481,7 +510,9 @@ void main() {
 
   group('analyseSamples() – edge cases', () {
     test('single-sample channels returns no defects', () async {
-      final samples = [Float32List.fromList([0.5])];
+      final samples = [
+        Float32List.fromList([0.5])
+      ];
       final result = analyseSamples(samples, sampleRate: 44100);
       expect(result.defects, isEmpty);
     });
@@ -491,8 +522,7 @@ void main() {
         Float32List(44100),
         Float32List(44100),
       ]; // 1 second stereo
-      final result = analyseSamples(samples,
-          sampleRate: 44100, bitDepth: 24);
+      final result = analyseSamples(samples, sampleRate: 44100, bitDepth: 24);
       expect(result.metadata.sampleRate, equals(44100));
       expect(result.metadata.bitDepth, equals(24));
       expect(result.metadata.channels, equals(2));

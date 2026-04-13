@@ -247,15 +247,34 @@ void main() {
       int pos = 0;
 
       void writeFCC(String s) {
-        for (final c in s.codeUnits) { buf[pos++] = c; }
+        for (final c in s.codeUnits) {
+          buf[pos++] = c;
+        }
       }
-      void u16(int v) { bd.setUint16(pos, v, Endian.little); pos += 2; }
-      void u32(int v) { bd.setUint32(pos, v, Endian.little); pos += 4; }
 
-      writeFCC('RIFF'); u32(fileSize); writeFCC('WAVE');
-      writeFCC('fmt '); u32(16);
-      u16(1); u16(2); u32(sampleRate); u32(sampleRate * 4); u16(4); u16(16);
-      writeFCC('data'); u32(dataSize);
+      void u16(int v) {
+        bd.setUint16(pos, v, Endian.little);
+        pos += 2;
+      }
+
+      void u32(int v) {
+        bd.setUint32(pos, v, Endian.little);
+        pos += 4;
+      }
+
+      writeFCC('RIFF');
+      u32(fileSize);
+      writeFCC('WAVE');
+      writeFCC('fmt ');
+      u32(16);
+      u16(1);
+      u16(2);
+      u32(sampleRate);
+      u32(sampleRate * 4);
+      u16(4);
+      u16(16);
+      writeFCC('data');
+      u32(dataSize);
       for (int i = 0; i < numFrames; i++) {
         u16(1000 & 0xFFFF); // L
         u16(2000 & 0xFFFF); // R
@@ -507,18 +526,27 @@ void main() {
       final numSamples = 10;
       final dataSize = numSamples * 2;
       final fmtChunkSize = 20; // 16 standard + 4 extension bytes
-      final fileSize =
-          12 + 8 + fmtChunkSize + 8 + dataSize; // RIFF + fmt header + fmt data + data header + data
+      final fileSize = 12 +
+          8 +
+          fmtChunkSize +
+          8 +
+          dataSize; // RIFF + fmt header + fmt data + data header + data
 
       final bd = ByteData(fileSize);
       var offset = 0;
       // RIFF header
-      for (final c in 'RIFF'.codeUnits) { bd.setUint8(offset++, c); }
+      for (final c in 'RIFF'.codeUnits) {
+        bd.setUint8(offset++, c);
+      }
       bd.setUint32(offset, fileSize - 8, Endian.little);
       offset += 4;
-      for (final c in 'WAVE'.codeUnits) { bd.setUint8(offset++, c); }
+      for (final c in 'WAVE'.codeUnits) {
+        bd.setUint8(offset++, c);
+      }
       // fmt chunk
-      for (final c in 'fmt '.codeUnits) { bd.setUint8(offset++, c); }
+      for (final c in 'fmt '.codeUnits) {
+        bd.setUint8(offset++, c);
+      }
       bd.setUint32(offset, fmtChunkSize, Endian.little);
       offset += 4;
       bd.setUint16(offset, 1, Endian.little);
@@ -539,7 +567,9 @@ void main() {
       bd.setUint16(offset, 0, Endian.little);
       offset += 2; // padding
       // data chunk
-      for (final c in 'data'.codeUnits) { bd.setUint8(offset++, c); }
+      for (final c in 'data'.codeUnits) {
+        bd.setUint8(offset++, c);
+      }
       bd.setUint32(offset, dataSize, Endian.little);
       offset += 4;
       // Write some samples
@@ -568,12 +598,18 @@ void main() {
       final bd = ByteData(fileSize);
       var offset = 0;
       // RIFF header
-      for (final c in 'RIFF'.codeUnits) { bd.setUint8(offset++, c); }
+      for (final c in 'RIFF'.codeUnits) {
+        bd.setUint8(offset++, c);
+      }
       bd.setUint32(offset, fileSize - 8, Endian.little);
       offset += 4;
-      for (final c in 'WAVE'.codeUnits) { bd.setUint8(offset++, c); }
+      for (final c in 'WAVE'.codeUnits) {
+        bd.setUint8(offset++, c);
+      }
       // fmt chunk (16 bytes)
-      for (final c in 'fmt '.codeUnits) { bd.setUint8(offset++, c); }
+      for (final c in 'fmt '.codeUnits) {
+        bd.setUint8(offset++, c);
+      }
       bd.setUint32(offset, 16, Endian.little);
       offset += 4;
       bd.setUint16(offset, 1, Endian.little);
@@ -589,7 +625,9 @@ void main() {
       bd.setUint16(offset, 16, Endian.little);
       offset += 2;
       // Unknown chunk 1: "TST1" size=5
-      for (final c in 'TST1'.codeUnits) { bd.setUint8(offset++, c); }
+      for (final c in 'TST1'.codeUnits) {
+        bd.setUint8(offset++, c);
+      }
       bd.setUint32(offset, 5, Endian.little);
       offset += 4;
       for (var i = 0; i < 5; i++) {
@@ -597,7 +635,9 @@ void main() {
       }
       bd.setUint8(offset++, 0); // padding byte
       // Unknown chunk 2: "TST2" size=3
-      for (final c in 'TST2'.codeUnits) { bd.setUint8(offset++, c); }
+      for (final c in 'TST2'.codeUnits) {
+        bd.setUint8(offset++, c);
+      }
       bd.setUint32(offset, 3, Endian.little);
       offset += 4;
       for (var i = 0; i < 3; i++) {
@@ -605,7 +645,9 @@ void main() {
       }
       bd.setUint8(offset++, 0); // padding byte
       // data chunk
-      for (final c in 'data'.codeUnits) { bd.setUint8(offset++, c); }
+      for (final c in 'data'.codeUnits) {
+        bd.setUint8(offset++, c);
+      }
       bd.setUint32(offset, dataSize, Endian.little);
       offset += 4;
       for (var i = 0; i < numSamples; i++) {
