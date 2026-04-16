@@ -166,6 +166,8 @@ dart pub global activate audio_defect_detector
 audiodefect analyse <file|glob> [options]
 ```
 
+Glob patterns support `*`, `**` (recursive), `?`, character classes `[abc]`, and brace expansion `{a,b}` — e.g. `audiodefect analyse '**/*.wav'`.
+
 #### Options
 | Flag | Description |
 |---|---|
@@ -245,6 +247,8 @@ $ audiodefect analyse recording.raw --raw --sample-rate=48000 --bit-depth=24 --c
 | 1 | WAV IEEE Float 32-bit | ✅ Supported |
 | 1 | AIFF PCM 8/16/24/32-bit, mono/stereo | ✅ Supported |
 | 1 | AIFF-C (`NONE` and `sowt` variants) | ✅ Supported |
+| 1 | AIFF-C `fl32` (32-bit big-endian float) | ✅ Supported |
+| 1 | AIFF-C `ulaw` / `alaw` (ITU-T G.711) | ✅ Supported |
 | 2 | FLAC 16/24-bit, mono/stereo | 🔜 Planned |
 
 ---
@@ -262,6 +266,5 @@ dart test
 
 - Maximum file size: 2 GB (files are loaded entirely into memory)
 - FLAC format is not yet supported (planned for future release)
-- AIFF-C compressed formats other than `NONE`/`sowt` are not supported
-- Glob support in CLI is limited to simple `prefix*suffix` patterns
+- AIFF-C codecs beyond `NONE`, `sowt`, `fl32`, `ulaw` and `alaw` (e.g. IMA4, MAC3) are not supported
 

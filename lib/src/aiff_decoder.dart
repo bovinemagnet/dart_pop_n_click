@@ -112,27 +112,48 @@ AiffData decodeAiff(Uint8List bytes) {
     throw UnsupportedFormatException('Unsupported AIFF bit depth: $bitDepth.');
   }
 
-  // ---- Determine endianness ------------------------------------------------
-  Endian endian;
-  if (!isAifC || compressionType == null || compressionType == 'NONE') {
+  // ---- Determine endianness and (possibly) decompress ---------------------
+  final compType = compressionType?.toLowerCase();
+  Endian endian = Endian.big;
+  bool isFloat = false;
+  var audioBytes = ssndData;
+  int effectiveBitDepth = bitDepth;
+
+  if (!isAifC || compressionType == null || compType == 'none') {
     endian = Endian.big;
-  } else if (compressionType == 'sowt') {
+  } else if (compType == 'sowt') {
     endian = Endian.little;
+  } else if (compType == 'fl32') {
+    if (bitDepth != 32) {
+      throw CorruptFileException(
+          'fl32 compression requires 32-bit sample size, got $bitDepth.');
+    }
+    endian = Endian.big;
+    isFloat = true;
+  } else if (compType == 'ulaw') {
+    audioBytes = _expandG711(ssndData, _muLawTable);
+    endian = Endian.little;
+    effectiveBitDepth = 16;
+  } else if (compType == 'alaw') {
+    audioBytes = _expandG711(ssndData, _aLawTable);
+    endian = Endian.little;
+    effectiveBitDepth = 16;
   } else {
     throw UnsupportedFormatException(
         'Unsupported AIFF-C compression type: "$compressionType". '
-        'Only NONE and sowt are supported.');
+        'Supported: NONE, sowt, fl32, ulaw, alaw.');
   }
 
   // ---- Decode samples ------------------------------------------------------
   final pcmFormat = PcmFormat(
     sampleRate: sampleRate,
-    bitDepth: bitDepth,
+    bitDepth: effectiveBitDepth,
     channels: channels,
     endian: endian,
+    isFloat: isFloat,
     signed8bit: true, // AIFF 8-bit is always signed
   );
-  final channelSamples = decodePcmBytes(ssndData, pcmFormat);
+  final channelSamples = decodePcmBytes(audioBytes, pcmFormat);
 
   final totalFrames = channelSamples.isEmpty ? 0 : channelSamples[0].length;
   final durationMs = (totalFrames / sampleRate * 1000).round();
@@ -180,6 +201,60 @@ double _readExtended(Uint8List data) {
   const twoTo63 = 9223372036854775808.0;
   final f = mantissaDouble / twoTo63 * math.pow(2, exponent - 16383);
   return sign == 1 ? -f : f;
+}
+
+// ---------------------------------------------------------------------------
+// ITU-T G.711 μ-law / A-law expansion
+// ---------------------------------------------------------------------------
+
+/// Expand a G.711-companded byte stream to linear 16-bit PCM (little-endian).
+///
+/// Each input byte maps to one 16-bit sample via [table].
+Uint8List _expandG711(Uint8List input, Int16List table) {
+  final out = Uint8List(input.length * 2);
+  final view = ByteData.sublistView(out);
+  for (int i = 0; i < input.length; i++) {
+    view.setInt16(i * 2, table[input[i]], Endian.little);
+  }
+  return out;
+}
+
+/// ITU-T G.711 μ-law decode table (256 entries, byte → int16).
+final Int16List _muLawTable = _buildMuLawTable();
+
+/// ITU-T G.711 A-law decode table (256 entries, byte → int16).
+final Int16List _aLawTable = _buildALawTable();
+
+Int16List _buildMuLawTable() {
+  final t = Int16List(256);
+  for (int i = 0; i < 256; i++) {
+    final u = ~i & 0xFF;
+    final sign = (u & 0x80) != 0;
+    final exponent = (u >> 4) & 0x07;
+    final mantissa = u & 0x0F;
+    int sample = ((mantissa << 3) + 0x84) << exponent;
+    sample -= 0x84;
+    t[i] = sign ? -sample : sample;
+  }
+  return t;
+}
+
+Int16List _buildALawTable() {
+  final t = Int16List(256);
+  for (int i = 0; i < 256; i++) {
+    final a = i ^ 0x55;
+    final sign = (a & 0x80) != 0;
+    final exponent = (a >> 4) & 0x07;
+    final mantissa = a & 0x0F;
+    int sample;
+    if (exponent == 0) {
+      sample = (mantissa << 4) + 8;
+    } else {
+      sample = ((mantissa << 4) + 0x108) << (exponent - 1);
+    }
+    t[i] = sign ? -sample : sample;
+  }
+  return t;
 }
 
 // ---------------------------------------------------------------------------

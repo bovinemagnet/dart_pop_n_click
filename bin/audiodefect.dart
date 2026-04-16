@@ -16,11 +16,12 @@ library;
 
 import 'dart:convert';
 import 'dart:io';
-import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:args/args.dart';
 import 'package:audio_defect_detector/audio_defect_detector.dart';
+import 'package:glob/glob.dart';
+import 'package:glob/list_local_fs.dart';
 
 // ---------------------------------------------------------------------------
 // Exit codes
@@ -109,8 +110,7 @@ Future<void> main(List<String> args) async {
   }
 
   if (topLevel['version'] as bool) {
-    // TODO: Keep in sync with version in pubspec.yaml.
-    stdout.writeln('audiodefect 0.1.0');
+    stdout.writeln('audiodefect $packageVersion');
     exit(_exitClean);
   }
 
@@ -189,7 +189,7 @@ Future<void> _runAnalyse(ArgResults cmd) async {
   );
 
   // Expand globs
-  final filePaths = await _expandPaths(cmd.rest);
+  final filePaths = await expandPaths(cmd.rest);
   if (filePaths.isEmpty) {
     stderr
         .writeln('Error: no matching files found for: ${cmd.rest.join(', ')}');
@@ -367,36 +367,27 @@ double _parseDouble(String s, String argName) {
 // Path / glob expansion
 // ---------------------------------------------------------------------------
 
-Future<List<String>> _expandPaths(List<String> patterns) async {
-  final List<String> paths = [];
+/// Expand [patterns] into a de-duplicated list of file paths.
+///
+/// Each pattern may be a literal file path or a glob expression.
+/// Supports `*`, `**`, `?`, `[abc]`, and `{a,b}` as per the `glob` package.
+/// Exposed (not library-private) so it can be exercised from tests.
+Future<List<String>> expandPaths(List<String> patterns) async {
+  final seen = <String>{};
   for (final pattern in patterns) {
-    final f = File(pattern);
-    if (await f.exists()) {
-      paths.add(pattern);
+    // Literal existing file — fast path, preserves user-supplied casing/separators.
+    final literal = File(pattern);
+    if (await literal.exists()) {
+      seen.add(pattern);
       continue;
     }
-    // Naive glob: only support trailing wildcard with a base directory
-    final sep = Platform.pathSeparator;
-    final idx = math.max(pattern.lastIndexOf('/'), pattern.lastIndexOf(sep));
-    final dir =
-        idx < 0 ? Directory.current : Directory(pattern.substring(0, idx));
-    final glob = idx < 0 ? pattern : pattern.substring(idx + 1);
-    if (await dir.exists()) {
-      await for (final entity in dir.list()) {
-        if (entity is File && _matchGlob(glob, entity.path.split(sep).last)) {
-          paths.add(entity.path);
-        }
-      }
+    final glob = Glob(pattern);
+    await for (final entity in glob.list()) {
+      if (entity is File) seen.add(entity.path);
     }
   }
-  return paths;
-}
-
-bool _matchGlob(String pattern, String name) {
-  if (!pattern.contains('*')) return pattern == name;
-  final parts = pattern.split('*');
-  if (parts.length != 2) return false;
-  return name.startsWith(parts[0]) && name.endsWith(parts[1]);
+  final out = seen.toList()..sort();
+  return out;
 }
 
 // ---------------------------------------------------------------------------

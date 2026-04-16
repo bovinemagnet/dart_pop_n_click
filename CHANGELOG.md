@@ -1,3 +1,9 @@
+## 0.2.0 (2026-04-15)
+
+- AIFF-C compression support extended: `fl32` (32-bit big-endian float), `ulaw` (ITU-T G.711 μ-law) and `alaw` (ITU-T G.711 A-law)
+- CLI `analyse` command now accepts full glob syntax (`*`, `**`, `?`, `[abc]`, `{a,b}`) via the `glob` package
+- New `packageVersion` constant exported from the library; CLI `--version` now derives from a single source
+
 ## 0.1.0 (2026-04-13)
 
 - Clipping detection (`DefectType.clipping`) — flags runs of consecutive samples at ±1.0
