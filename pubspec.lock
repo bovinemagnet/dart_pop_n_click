@@ -81,6 +81,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.7"
+  dart_flac:
+    dependency: "direct main"
+    description:
+      name: dart_flac
+      sha256: "53c2086f4f839c4df975675119f30d5bc2b53044c2b16498c2eb23ba50ba5cb3"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.5"
   file:
     dependency: transitive
     description:
@@ -89,6 +97,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "7.0.1"
+  fixnum:
+    dependency: transitive
+    description:
+      name: fixnum
+      sha256: b6dc7065e46c974bc7c5f143080a6764ec7a4be6da1285ececdc37be96de53be
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.1.1"
   frontend_server_client:
     dependency: transitive
     description:

@@ -5,6 +5,7 @@ import 'dart:io';
 import 'dart:typed_data';
 import 'models.dart';
 import 'aiff_decoder.dart';
+import 'flac_decoder.dart';
 import 'wav_decoder.dart';
 import 'pcm_decoder.dart';
 import 'detector.dart';
@@ -15,9 +16,9 @@ import 'detector.dart';
 
 /// Analyse the audio file at [path] and return an [AnalysisResult].
 ///
-/// The format is auto-detected from the file extension (`.wav`, `.aiff`, `.aif`, `.aifc`) and validated
-/// against the file's magic bytes.  A [config] can be passed to tune
-/// sensitivity and filtering.
+/// The format is auto-detected from the file extension (`.wav`, `.aiff`, `.aif`,
+/// `.aifc`, `.flac`) and validated against the file's magic bytes.  A [config]
+/// can be passed to tune sensitivity and filtering.
 ///
 /// Throws:
 /// - [IoException] if the file cannot be read.
@@ -62,6 +63,8 @@ AnalysisResult analyseBytes(
       return _analyseWav(bytes, config);
     case _AudioFormat.aiff:
       return _analyseAiff(bytes, config);
+    case _AudioFormat.flac:
+      return _analyseFlac(bytes, config);
   }
 }
 
@@ -177,10 +180,31 @@ AnalysisResult _buildResult(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-enum _AudioFormat { wav, aiff }
+enum _AudioFormat { wav, aiff, flac }
 
 _AudioFormat _detectFormat(Uint8List bytes, String? path) {
   // Magic bytes check takes priority
+  if (bytes.length >= 4) {
+    // FLAC: "fLaC" stream marker at offset 0.
+    if (bytes[0] == 0x66 && // f
+        bytes[1] == 0x4C && // L
+        bytes[2] == 0x61 && // a
+        bytes[3] == 0x43) {
+      // C
+      return _AudioFormat.flac;
+    }
+    // Ogg container ("OggS"): Ogg-encapsulated FLAC/Vorbis is not supported.
+    if (bytes[0] == 0x4F && // O
+        bytes[1] == 0x67 && // g
+        bytes[2] == 0x67 && // g
+        bytes[3] == 0x53) {
+      // S
+      throw UnsupportedFormatException(
+        'Ogg-encapsulated audio is not supported; only native FLAC streams '
+        'are. Re-encode as native FLAC (a `.flac` file starting with "fLaC").',
+      );
+    }
+  }
   if (bytes.length >= 12) {
     final isRiff = bytes[0] == 0x52 && // R
         bytes[1] == 0x49 && // I
@@ -218,12 +242,14 @@ _AudioFormat _detectFormat(Uint8List bytes, String? path) {
         return _AudioFormat.wav;
       case 'aiff' || 'aif' || 'aifc':
         return _AudioFormat.aiff;
+      case 'flac':
+        return _AudioFormat.flac;
     }
   }
 
   throw UnsupportedFormatException(
     'Cannot detect supported audio format from magic bytes or extension. '
-    'Currently only WAV (PCM) and AIFF/AIFC are supported.',
+    'Currently only WAV (PCM), AIFF/AIFC and FLAC are supported.',
   );
 }
 
@@ -243,6 +269,16 @@ AnalysisResult _analyseWav(Uint8List bytes, DetectorConfig config) {
     wavData.samples,
     wavData.metadata.sampleRate,
     wavData.metadata,
+    config,
+  );
+}
+
+AnalysisResult _analyseFlac(Uint8List bytes, DetectorConfig config) {
+  final flacData = decodeFlac(bytes);
+  return _buildResult(
+    flacData.samples,
+    flacData.metadata.sampleRate,
+    flacData.metadata,
     config,
   );
 }

@@ -4,4 +4,4 @@
 /// `test/version_test.dart` guard verifies this at test time.
 library;
 
-const packageVersion = '0.2.0';
+const packageVersion = '0.3.0';

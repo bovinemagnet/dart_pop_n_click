@@ -18,14 +18,15 @@ dart bin/audiodefect.dart analyse <file>  # Run CLI from source
 This is a pure Dart library (`audio_defect_detector`) for detecting pops and clicks in audio files. The codebase follows a layered architecture:
 
 ```
-models → pcm_decoder → wav_decoder → detector → analyser → CLI (bin/audiodefect.dart)
-                ↑                         ↑
-           math_utils ──────────────────┘
+models → pcm_decoder → wav/aiff/flac decoders → detector → analyser → CLI (bin/audiodefect.dart)
+                ↑                                    ↑
+           math_utils ───────────────────────────────┘
 ```
 
 - **`lib/src/models.dart`** — Data models (`DetectorConfig`, `Defect`, `AnalysisResult`, `AudioMetadata`), enums (`Sensitivity`, `DefectType`), and custom exceptions
 - **`lib/src/wav_decoder.dart`** — Pure-Dart RIFF/WAV parser supporting PCM 8/16/24/32-bit and IEEE Float 32-bit; normalises samples to `Float32List` in [-1.0, 1.0]
 - **`lib/src/aiff_decoder.dart`** — Pure-Dart AIFF/AIFF-C parser supporting big-endian PCM 8/16/24/32-bit and `sowt` little-endian variant; follows the same pattern as wav_decoder and delegates to pcm_decoder
+- **`lib/src/flac_decoder.dart`** — FLAC parser; `decodeFlac()` wraps the pure-Dart `dart_flac` package and adapts its output to the same `FlacData` (metadata + per-channel `Float32List`) shape as wav_decoder/aiff_decoder. Native FLAC streams only (no Ogg-FLAC).
 - **`lib/src/detector.dart`** — Core detection algorithm: high-pass differentiator → adaptive MAD threshold over ~10ms window → region merging → classification (click: 1–10 samples, pop: 10–150 samples) → logistic confidence scoring. Also detects clipping (runs of consecutive samples at ±1.0), dropouts (brief unexpected digital silence mid-audio), and reports per-channel DC offset via `AnalysisResult.dcOffsetPerChannel`.
 - **`lib/src/pcm_decoder.dart`** — Raw PCM byte normalisation, used by wav_decoder and available directly via `decodePcmBytes()`
 - **`lib/src/math_utils.dart`** — Public statistical utilities (`median`, `mad`) used by the detector and available to consumers
@@ -36,6 +37,6 @@ models → pcm_decoder → wav_decoder → detector → analyser → CLI (bin/au
 
 - SDK constraint: Dart >=3.5.0 <4.0.0
 - Linting: `package:lints/recommended.yaml`
-- Tests use synthetic audio generation (silence, sine waves, injected defects) — no fixture files needed
+- Tests use synthetic audio generation (silence, sine waves, injected defects); the only fixture files are the FLAC samples under `test/fixtures/flac/`, regenerable via `dart run tool/generate_flac_fixtures.dart`
 - Public API is exported through `lib/audio_defect_detector.dart`
 - British spelling throughout (e.g. `analyser`, `normalise`)
