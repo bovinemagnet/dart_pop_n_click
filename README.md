@@ -1,12 +1,13 @@
 # dart_pop_n_click
 
-Pure Dart library to detect pops and clicks in WAV audio files.
+Pure Dart library to detect pops and clicks in WAV, AIFF and FLAC audio files.
 
 ## Features
 
-- Detect clicks (1–10 samples) and pops (10–150 samples) in WAV and AIFF audio
+- Detect clicks (1–10 samples) and pops (10–150 samples) in WAV, AIFF and FLAC audio
 - Detects clipping (hard digital saturation), dropouts (brief digital silence), and DC offset
 - AIFF and AIFF-C format support (big-endian PCM, `sowt` little-endian variant)
+- FLAC support for native streams, decoded via the pure-Dart `dart_flac` package
 - Adaptive MAD-based threshold with configurable sensitivity
 - Support for PCM 8/16/24/32-bit and IEEE Float 32-bit WAV files
 - Raw PCM byte analysis without WAV headers
@@ -25,7 +26,7 @@ dart pub add audio_defect_detector
 
 ## Package: `audio_defect_detector`
 
-A pure-Dart, cross-platform library for detecting transient audio defects (pops and clicks) in WAV files, with a companion CLI tool.
+A pure-Dart, cross-platform library for detecting transient audio defects (pops and clicks) in WAV, AIFF and FLAC files, with a companion CLI tool.
 
 ---
 
@@ -249,7 +250,7 @@ $ audiodefect analyse recording.raw --raw --sample-rate=48000 --bit-depth=24 --c
 | 1 | AIFF-C (`NONE` and `sowt` variants) | ✅ Supported |
 | 1 | AIFF-C `fl32` (32-bit big-endian float) | ✅ Supported |
 | 1 | AIFF-C `ulaw` / `alaw` (ITU-T G.711) | ✅ Supported |
-| 2 | FLAC 16/24-bit, mono/stereo | 🔜 Planned |
+| 2 | FLAC native streams, 8/16/24-bit, mono/multi-channel | ✅ Supported |
 
 ---
 
@@ -265,6 +266,7 @@ dart test
 ## Limitations
 
 - Maximum file size: 2 GB (files are loaded entirely into memory)
-- FLAC format is not yet supported (planned for future release)
+- Ogg-encapsulated FLAC is not supported (only native FLAC streams beginning with the `fLaC` marker)
+- FLAC MD5 / CRC stream-integrity verification is not surfaced
 - AIFF-C codecs beyond `NONE`, `sowt`, `fl32`, `ulaw` and `alaw` (e.g. IMA4, MAC3) are not supported
 

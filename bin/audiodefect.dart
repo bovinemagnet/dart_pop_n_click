@@ -2,7 +2,7 @@
 
 /// `audiodefect` — Command-line interface for the audio_defect_detector library.
 ///
-/// Supported formats: WAV (.wav), AIFF (.aiff, .aif, .aifc).
+/// Supported formats: WAV (.wav), AIFF (.aiff, .aif, .aifc), FLAC (.flac).
 ///
 /// Usage:
 ///   audiodefect analyse `<file|glob>` [options]
@@ -44,8 +44,8 @@ Future<void> main(List<String> args) async {
         ..addOption(
           'format',
           abbr: 'f',
-          help: 'Override format detection (wav, aiff).',
-          allowed: ['wav', 'aiff'],
+          help: 'Override format detection (wav, aiff, flac).',
+          allowed: ['wav', 'aiff', 'flac'],
         )
         ..addOption(
           'sensitivity',
@@ -397,7 +397,7 @@ Future<List<String>> expandPaths(List<String> patterns) async {
 void _usage(ArgParser parser, [String? error]) {
   if (error != null) stderr.writeln('Error: $error\n');
   stdout
-    ..writeln('audiodefect — Audio pop/click defect detector (WAV, AIFF)')
+    ..writeln('audiodefect — Audio pop/click defect detector (WAV, AIFF, FLAC)')
     ..writeln()
     ..writeln('Usage:')
     ..writeln('  audiodefect analyse <file|glob> [options]')
@@ -405,6 +405,7 @@ void _usage(ArgParser parser, [String? error]) {
     ..writeln('Examples:')
     ..writeln('  audiodefect analyse recording.wav')
     ..writeln('  audiodefect analyse recording.aiff')
+    ..writeln('  audiodefect analyse recording.flac')
     ..writeln(
         '  audiodefect analyse recording.raw --raw --sample-rate=48000 --bit-depth=24 --channels=1')
     ..writeln()

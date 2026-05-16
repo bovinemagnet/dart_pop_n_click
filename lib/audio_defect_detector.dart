@@ -18,6 +18,7 @@ library audio_defect_detector;
 
 export 'src/aiff_decoder.dart';
 export 'src/analyser.dart';
+export 'src/flac_decoder.dart';
 export 'src/math_utils.dart';
 export 'src/models.dart';
 export 'src/pcm_decoder.dart';

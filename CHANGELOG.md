@@ -1,3 +1,11 @@
+## 0.3.0 (2026-05-17)
+
+- FLAC support — native FLAC streams can now be analysed via `analyseFile()` / `analyseBytes()`, and decoded directly with the new `decodeFlac()` function returning `FlacData`
+- New `flac_decoder.dart` module wraps the pure-Dart `dart_flac` package; FLAC remains a no-native-dependency format
+- Format auto-detection now recognises the `fLaC` magic bytes and the `.flac` extension
+- Ogg-encapsulated audio is now explicitly rejected with `UnsupportedFormatException`
+- CLI `analyse` command and `--format` option accept `flac`
+
 ## 0.2.0 (2026-04-15)
 
 - AIFF-C compression support extended: `fl32` (32-bit big-endian float), `ulaw` (ITU-T G.711 μ-law) and `alaw` (ITU-T G.711 A-law)

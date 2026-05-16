@@ -92,8 +92,8 @@ void main() {
         isAifC: true,
         compressionType: 'ima4',
       );
-      expect(() => analyseBytes(aiff),
-          throwsA(isA<UnsupportedFormatException>()));
+      expect(
+          () => analyseBytes(aiff), throwsA(isA<UnsupportedFormatException>()));
     });
   });
 }
