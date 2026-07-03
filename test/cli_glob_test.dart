@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:audio_defect_detector/audio_defect_detector.dart';
 import 'package:test/test.dart';
 
 import '../bin/audiodefect.dart' as cli;
@@ -61,5 +62,22 @@ void main() {
   test('non-matching pattern returns empty', () async {
     final r = await cli.expandPaths(['nope_*.xyz']);
     expect(r, isEmpty);
+  });
+
+  group('readRawBytes', () {
+    test('reads an existing file', () async {
+      final bytes = await cli.readRawBytes('a.wav');
+      expect(bytes, isNotEmpty);
+    });
+
+    test('translates a filesystem error into IoException', () {
+      // Reading a directory as bytes fails with a FileSystemException; the
+      // CLI must surface it as the library IoException (caught -> exit 3),
+      // not crash with an unhandled exception.
+      expect(
+        () => cli.readRawBytes('sub1'),
+        throwsA(isA<IoException>()),
+      );
+    });
   });
 }
