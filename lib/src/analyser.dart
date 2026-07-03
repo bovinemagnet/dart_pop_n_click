@@ -163,6 +163,12 @@ AnalysisResult _buildResult(
 
   allDefects.sort((a, b) => a.offset.compareTo(b.offset));
 
+  // detectDefects filters clicks/pops by minConfidence/maxDefects, but the
+  // clipping and dropout defects are appended here afterwards. Apply the same
+  // limits to the combined list so every reported defect honours the config
+  // (matching the AnalysisResult.defects contract).
+  final reported = _applyLimits(allDefects, config);
+
   List<double> dcOffsets = const [];
   if (config.detectDcOffset) {
     final raw = computeDcOffsets(channels);
@@ -171,9 +177,9 @@ AnalysisResult _buildResult(
         .toList(growable: false);
   }
 
-  final aggregate = computeAggregateConfidence(allDefects);
+  final aggregate = computeAggregateConfidence(reported);
   return AnalysisResult(
-    defects: allDefects,
+    defects: reported,
     aggregateConfidence: aggregate,
     metadata: metadata,
     dcOffsetPerChannel: dcOffsets,
@@ -183,6 +189,18 @@ AnalysisResult _buildResult(
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
+
+/// Apply the [DetectorConfig.minConfidence] threshold and
+/// [DetectorConfig.maxDefects] cap to an offset-sorted defect list.
+List<Defect> _applyLimits(List<Defect> defects, DetectorConfig config) {
+  final filtered = config.minConfidence > 0
+      ? defects.where((d) => d.confidence >= config.minConfidence).toList()
+      : defects;
+  if (config.maxDefects > 0 && filtered.length > config.maxDefects) {
+    return filtered.sublist(0, config.maxDefects);
+  }
+  return filtered;
+}
 
 /// A supported container format, used to override magic-byte auto-detection.
 enum AudioFileFormat {

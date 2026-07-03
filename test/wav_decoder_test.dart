@@ -131,6 +131,71 @@ Uint8List buildWavRaw({
   return buf;
 }
 
+/// Build a 16-bit mono WAVE_FORMAT_EXTENSIBLE (0xFFFE) PCM file.
+///
+/// The fmt chunk is 40 bytes: the 16 standard bytes plus a 22-byte extension
+/// (cbSize, wValidBitsPerSample, dwChannelMask, and the 16-byte SubFormat GUID).
+/// [subFormatCode] is the low word of the GUID (1 = PCM, 3 = IEEE float).
+Uint8List buildWavExtensible16Mono(
+  List<int> samples, {
+  int sampleRate = 44100,
+  int subFormatCode = 1,
+}) {
+  const fmtSize = 40;
+  final dataSize = samples.length * 2;
+  final riffSize = 4 + (8 + fmtSize) + (8 + dataSize);
+  final buf = Uint8List(8 + riffSize);
+  final bd = ByteData.sublistView(buf);
+  int pos = 0;
+
+  void writeFourCC(String s) {
+    for (final c in s.codeUnits) {
+      buf[pos++] = c;
+    }
+  }
+
+  void writeU16(int v) {
+    bd.setUint16(pos, v, Endian.little);
+    pos += 2;
+  }
+
+  void writeU32(int v) {
+    bd.setUint32(pos, v, Endian.little);
+    pos += 4;
+  }
+
+  writeFourCC('RIFF');
+  writeU32(riffSize);
+  writeFourCC('WAVE');
+
+  writeFourCC('fmt ');
+  writeU32(fmtSize);
+  writeU16(0xFFFE); // WAVE_FORMAT_EXTENSIBLE
+  writeU16(1); // mono
+  writeU32(sampleRate);
+  writeU32(sampleRate * 2); // byte rate
+  writeU16(2); // block align
+  writeU16(16); // bits per sample (container)
+  writeU16(22); // cbSize
+  writeU16(16); // wValidBitsPerSample
+  writeU32(0x4); // dwChannelMask (SPEAKER_FRONT_CENTER)
+  // SubFormat GUID: {subFormatCode-0000-0010-8000-00AA00389B71}
+  writeU16(subFormatCode); // GUID Data1 low word
+  writeU16(0); // Data1 high word
+  writeU16(0); // Data2
+  writeU16(0x0010); // Data3
+  for (final b in [0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71]) {
+    buf[pos++] = b;
+  }
+
+  writeFourCC('data');
+  writeU32(dataSize);
+  for (final s in samples) {
+    writeU16(s & 0xFFFF);
+  }
+  return buf;
+}
+
 /// Build a WAV that has no fmt chunk — only RIFF/WAVE header and a data chunk.
 Uint8List buildWavMissingFmt({int dataSize = 100}) {
   final riffSize = 4 + 8 + dataSize; // WAVE + data chunk header + data
@@ -477,6 +542,50 @@ void main() {
       final data = decodeWav(wav);
       expect(data.samples[0][0], closeTo(1.0, 1e-6));
       expect(data.samples[0][1], closeTo(-1.0, 1e-6));
+    });
+
+    test('64-bit float is rejected rather than mis-decoded', () {
+      // The float decoder only handles 32-bit samples. A 64-bit float file
+      // must fail loudly instead of silently reading garbage at a 4-byte
+      // stride.
+      final raw = Uint8List(16); // two float64 words
+      final wav = buildWavRaw(
+        rawSampleBytes: raw,
+        bitDepth: 64,
+        audioFormat: 3,
+      );
+      expect(() => decodeWav(wav), throwsA(isA<UnsupportedFormatException>()));
+    });
+
+    test('16-bit float is rejected', () {
+      final raw = Uint8List(4);
+      final wav = buildWavRaw(
+        rawSampleBytes: raw,
+        bitDepth: 16,
+        audioFormat: 3,
+      );
+      expect(() => decodeWav(wav), throwsA(isA<UnsupportedFormatException>()));
+    });
+  });
+
+  group('WAV decoder – WAVE_FORMAT_EXTENSIBLE', () {
+    test('decodes 16-bit PCM extensible file via the SubFormat GUID', () {
+      final wav = buildWavExtensible16Mono([0, 32767, -32768, 0]);
+      final data = decodeWav(wav);
+      expect(data.metadata.channels, equals(1));
+      expect(data.metadata.bitDepth, equals(16));
+      expect(data.metadata.sampleRate, equals(44100));
+      expect(data.samples[0][1], closeTo(1.0, 1e-4));
+      expect(data.samples[0][2], closeTo(-1.0, 1e-4));
+    });
+
+    test('rejects an extensible file with an unsupported SubFormat', () {
+      // SubFormat low word 6 (A-law) is not a PCM/float GUID.
+      final wav = buildWavExtensible16Mono([0, 0], subFormatCode: 6);
+      expect(
+        () => decodeWav(wav),
+        throwsA(isA<UnsupportedFormatException>()),
+      );
     });
   });
 
