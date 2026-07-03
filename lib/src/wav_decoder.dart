@@ -58,8 +58,23 @@ WavData decodeWav(Uint8List bytes) {
         reader.skip(4); // byte rate
         reader.skip(2); // block align
         bitDepth = reader.readUint16Le();
-        // Skip any extension bytes
-        if (chunkSize > 16) reader.skip(chunkSize - 16);
+        // Handle the fmt chunk extension.
+        if (chunkSize >= 18) {
+          final cbSize = reader.readUint16Le();
+          if (audioFormat == 0xFFFE && cbSize >= 22) {
+            // WAVE_FORMAT_EXTENSIBLE: the real sample format is the first two
+            // bytes of the 16-byte SubFormat GUID (PCM = 1, IEEE float = 3).
+            // Skip wValidBitsPerSample (2) and dwChannelMask (4) to reach it.
+            reader.skip(2);
+            reader.skip(4);
+            audioFormat = reader.readUint16Le();
+            reader.skip(14); // remainder of the GUID
+          } else {
+            reader.skip(chunkSize - 18); // 2 bytes already consumed for cbSize
+          }
+        } else if (chunkSize > 16) {
+          reader.skip(chunkSize - 16);
+        }
 
       case 'data':
         pcmData = reader.readBytes(chunkSize);
