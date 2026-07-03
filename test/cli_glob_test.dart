@@ -62,4 +62,24 @@ void main() {
     final r = await cli.expandPaths(['nope_*.xyz']);
     expect(r, isEmpty);
   });
+
+  group('normaliseGlobPattern', () {
+    test('converts backslashes to forward slashes on Windows', () {
+      expect(
+        cli.normaliseGlobPattern(r'recordings\*.wav', windows: true),
+        equals('recordings/*.wav'),
+      );
+      expect(
+        cli.normaliseGlobPattern(r'a\b\c\*.wav', windows: true),
+        equals('a/b/c/*.wav'),
+      );
+    });
+
+    test('leaves backslashes untouched on POSIX', () {
+      expect(
+        cli.normaliseGlobPattern(r'weird\*name.wav', windows: false),
+        equals(r'weird\*name.wav'),
+      );
+    });
+  });
 }
