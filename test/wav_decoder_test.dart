@@ -489,8 +489,7 @@ void main() {
         bitDepth: 64,
         audioFormat: 3,
       );
-      expect(() => decodeWav(wav),
-          throwsA(isA<UnsupportedFormatException>()));
+      expect(() => decodeWav(wav), throwsA(isA<UnsupportedFormatException>()));
     });
 
     test('16-bit float is rejected', () {
@@ -500,8 +499,7 @@ void main() {
         bitDepth: 16,
         audioFormat: 3,
       );
-      expect(() => decodeWav(wav),
-          throwsA(isA<UnsupportedFormatException>()));
+      expect(() => decodeWav(wav), throwsA(isA<UnsupportedFormatException>()));
     });
   });
 
