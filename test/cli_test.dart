@@ -182,6 +182,29 @@ void main() {
       }
     });
 
+    test('--format=wav is honoured on a clean WAV (exits 0)', () async {
+      final file = createTestWav(List.filled(44100, 0));
+      try {
+        final result = await runCli(['analyse', '--format=wav', file.path]);
+        expect(result.exitCode, equals(0));
+      } finally {
+        file.parent.deleteSync(recursive: true);
+      }
+    });
+
+    test('--format overrides detection: forcing aiff on a WAV exits 3',
+        () async {
+      // Proves the flag is actually read: a real WAV forced to decode as
+      // AIFF fails (exit 3), whereas auto-detection would exit 0.
+      final file = createTestWav(List.filled(44100, 0));
+      try {
+        final result = await runCli(['analyse', '--format=aiff', file.path]);
+        expect(result.exitCode, equals(3));
+      } finally {
+        file.parent.deleteSync(recursive: true);
+      }
+    });
+
     test('WAV with a click exits 1 (default threshold 0.0)', () async {
       // A sharp spike in silence should be detected as a defect.
       // The default threshold is 0.0, so any defect triggers exit code 1.

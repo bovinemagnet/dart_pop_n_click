@@ -80,6 +80,24 @@ void main() {
       expect(result.metadata.channels, 1);
       expect(result.metadata.sampleRate, 8000);
     });
+
+    test('preserves sign polarity (positive bytes decode positive)', () {
+      // Byte 0xAA decodes to the A-law maximum positive magnitude (+32256,
+      // ~+0.984 normalised) per ITU-T G.711. A stream of it therefore has a
+      // strong positive DC offset. A polarity-inverted decoder would report a
+      // negative DC offset here.
+      final compressed = Uint8List.fromList(List.filled(256, 0xAA));
+      final aiff = buildAiff(
+        channels: 1,
+        bitDepth: 16,
+        sampleRate: 8000,
+        pcmData: compressed,
+        isAifC: true,
+        compressionType: 'alaw',
+      );
+      final result = analyseBytes(aiff);
+      expect(result.dcOffsetPerChannel.single, greaterThan(0.9));
+    });
   });
 
   group('unsupported compression', () {

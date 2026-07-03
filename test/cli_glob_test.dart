@@ -80,4 +80,39 @@ void main() {
       );
     });
   });
+
+  test('malformed glob pattern returns empty instead of throwing', () async {
+    // Unmatched '[' is invalid glob syntax; package:glob throws a
+    // FormatException. The CLI must treat it as "no match", not crash.
+    final r = await cli.expandPaths(['track[1.wav']);
+    expect(r, isEmpty);
+  });
+
+  test('malformed glob still yields a matching literal file', () async {
+    // If a file literally named with the malformed pattern exists, the
+    // literal fast-path should still find it.
+    File('${tmp.path}/lit[.wav').writeAsStringSync('x');
+    final r = _norm(await cli.expandPaths(['lit[.wav']));
+    expect(r, equals(['lit[.wav']));
+  });
+
+  group('normaliseGlobPattern', () {
+    test('converts backslashes to forward slashes on Windows', () {
+      expect(
+        cli.normaliseGlobPattern(r'recordings\*.wav', windows: true),
+        equals('recordings/*.wav'),
+      );
+      expect(
+        cli.normaliseGlobPattern(r'a\b\c\*.wav', windows: true),
+        equals('a/b/c/*.wav'),
+      );
+    });
+
+    test('leaves backslashes untouched on POSIX', () {
+      expect(
+        cli.normaliseGlobPattern(r'weird\*name.wav', windows: false),
+        equals(r'weird\*name.wav'),
+      );
+    });
+  });
 }

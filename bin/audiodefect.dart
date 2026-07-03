@@ -188,6 +188,14 @@ Future<void> _runAnalyse(ArgResults cmd) async {
     minConfidence: minConfidence,
   );
 
+  // Optional format override (skips magic-byte auto-detection).
+  final formatOverride = switch (cmd['format'] as String?) {
+    'wav' => AudioFileFormat.wav,
+    'aiff' => AudioFileFormat.aiff,
+    'flac' => AudioFileFormat.flac,
+    _ => null,
+  };
+
   // Expand globs
   final filePaths = await expandPaths(cmd.rest);
   if (filePaths.isEmpty) {
@@ -206,7 +214,8 @@ Future<void> _runAnalyse(ArgResults cmd) async {
         final bytes = await readRawBytes(path);
         result = analysePcm(bytes, format: pcmFormat!, config: config);
       } else {
-        result = await analyseFile(path, config: config);
+        result =
+            await analyseFile(path, config: config, format: formatOverride);
       }
     } on IoException catch (e) {
       if (!quiet) stderr.writeln('Error: $e');
@@ -247,7 +256,8 @@ Future<void> _runAnalyse(ArgResults cmd) async {
         final bytes = await readRawBytes(path);
         result = analysePcm(bytes, format: pcmFormat!, config: config);
       } else {
-        result = await analyseFile(path, config: config);
+        result =
+            await analyseFile(path, config: config, format: formatOverride);
       }
     } on IoException catch (e) {
       errorMsg = '$e';
@@ -393,13 +403,33 @@ Future<List<String>> expandPaths(List<String> patterns) async {
       seen.add(pattern);
       continue;
     }
-    final glob = Glob(pattern);
-    await for (final entity in glob.list()) {
-      if (entity is File) seen.add(entity.path);
+    // A malformed glob (e.g. an unmatched '[' in a real filename) makes
+    // Glob throw a FormatException. Treat it as "no match" rather than
+    // letting it crash the CLI with an unhandled exception.
+    try {
+      final glob = Glob(normaliseGlobPattern(pattern));
+      await for (final entity in glob.list()) {
+        if (entity is File) seen.add(entity.path);
+      }
+    } on FormatException {
+      continue;
     }
   }
   final out = seen.toList()..sort();
   return out;
+}
+
+/// Normalise a glob [pattern]'s path separators for `package:glob`.
+///
+/// On Windows the shell separator is `\`, but `package:glob` treats `\` as an
+/// escape character, so `recordings\*.wav` would never match. Convert
+/// backslashes to forward slashes on Windows only; on POSIX `\` is a legitimate
+/// escape and is left untouched.
+///
+/// [windows] overrides platform detection (used by tests).
+String normaliseGlobPattern(String pattern, {bool? windows}) {
+  final onWindows = windows ?? Platform.isWindows;
+  return onWindows ? pattern.replaceAll(r'\', '/') : pattern;
 }
 
 // ---------------------------------------------------------------------------
