@@ -711,16 +711,16 @@ void main() {
 
       // Without a confidence floor the clipping defect is reported.
       final unfiltered = analyseBytes(wav);
-      expect(unfiltered.defects.any((d) => d.type == DefectType.clipping),
-          isTrue);
+      expect(
+          unfiltered.defects.any((d) => d.type == DefectType.clipping), isTrue);
 
       // With a high minConfidence the same clipping defect must be suppressed.
       final filtered = analyseBytes(
         wav,
         config: const DetectorConfig(minConfidence: 0.9),
       );
-      expect(filtered.defects.any((d) => d.type == DefectType.clipping),
-          isFalse);
+      expect(
+          filtered.defects.any((d) => d.type == DefectType.clipping), isFalse);
     });
 
     test('maxDefects caps the combined defect list', () {
