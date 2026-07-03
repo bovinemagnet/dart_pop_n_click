@@ -188,6 +188,14 @@ Future<void> _runAnalyse(ArgResults cmd) async {
     minConfidence: minConfidence,
   );
 
+  // Optional format override (skips magic-byte auto-detection).
+  final formatOverride = switch (cmd['format'] as String?) {
+    'wav' => AudioFileFormat.wav,
+    'aiff' => AudioFileFormat.aiff,
+    'flac' => AudioFileFormat.flac,
+    _ => null,
+  };
+
   // Expand globs
   final filePaths = await expandPaths(cmd.rest);
   if (filePaths.isEmpty) {
@@ -206,7 +214,8 @@ Future<void> _runAnalyse(ArgResults cmd) async {
         final bytes = Uint8List.fromList(await File(path).readAsBytes());
         result = analysePcm(bytes, format: pcmFormat!, config: config);
       } else {
-        result = await analyseFile(path, config: config);
+        result =
+            await analyseFile(path, config: config, format: formatOverride);
       }
     } on IoException catch (e) {
       if (!quiet) stderr.writeln('Error: $e');
@@ -247,7 +256,8 @@ Future<void> _runAnalyse(ArgResults cmd) async {
         final bytes = Uint8List.fromList(await File(path).readAsBytes());
         result = analysePcm(bytes, format: pcmFormat!, config: config);
       } else {
-        result = await analyseFile(path, config: config);
+        result =
+            await analyseFile(path, config: config, format: formatOverride);
       }
     } on IoException catch (e) {
       errorMsg = '$e';

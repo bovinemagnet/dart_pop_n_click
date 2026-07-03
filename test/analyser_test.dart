@@ -397,6 +397,27 @@ void main() {
   // Format detection edge cases
   // -------------------------------------------------------------------------
 
+  group('analyseBytes() – format override', () {
+    test('forcing a mismatched format bypasses auto-detection', () {
+      final wav = buildWav16MonoFromFloats(List<double>.filled(1000, 0.0));
+      // Valid WAV bytes, but forcing AIFF runs the AIFF decoder, which
+      // rejects the RIFF header — proving the override skipped detection.
+      expect(
+        () => analyseBytes(wav, format: AudioFileFormat.aiff),
+        throwsA(anyOf(
+          isA<CorruptFileException>(),
+          isA<UnsupportedFormatException>(),
+        )),
+      );
+    });
+
+    test('forcing the correct format decodes successfully', () {
+      final wav = buildWav16MonoFromFloats(List<double>.filled(1000, 0.0));
+      final result = analyseBytes(wav, format: AudioFileFormat.wav);
+      expect(result.metadata.channels, equals(1));
+    });
+  });
+
   group('analyseBytes() – format detection', () {
     test(
         'file with .wav extension but invalid magic bytes throws UnsupportedFormatException or CorruptFileException',
