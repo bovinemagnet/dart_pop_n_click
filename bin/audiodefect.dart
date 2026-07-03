@@ -211,7 +211,7 @@ Future<void> _runAnalyse(ArgResults cmd) async {
     try {
       if (!quiet && verbose) stderr.writeln('Analysing $path …');
       if (isRaw) {
-        final bytes = Uint8List.fromList(await File(path).readAsBytes());
+        final bytes = await readRawBytes(path);
         result = analysePcm(bytes, format: pcmFormat!, config: config);
       } else {
         result =
@@ -253,7 +253,7 @@ Future<void> _runAnalyse(ArgResults cmd) async {
     try {
       if (!quiet && verbose) stderr.writeln('Analysing $path …');
       if (isRaw) {
-        final bytes = Uint8List.fromList(await File(path).readAsBytes());
+        final bytes = await readRawBytes(path);
         result = analysePcm(bytes, format: pcmFormat!, config: config);
       } else {
         result =
@@ -376,6 +376,18 @@ double _parseDouble(String s, String argName) {
 // ---------------------------------------------------------------------------
 // Path / glob expansion
 // ---------------------------------------------------------------------------
+
+/// Read [path] as raw bytes for `--raw` mode, translating filesystem errors
+/// into the library's [IoException] so the CLI's typed catch clauses handle
+/// them (reporting exit code 3) instead of crashing with an unhandled
+/// [FileSystemException]. `analyseFile` does the same wrapping for non-raw mode.
+Future<Uint8List> readRawBytes(String path) async {
+  try {
+    return Uint8List.fromList(await File(path).readAsBytes());
+  } on FileSystemException catch (e) {
+    throw IoException('Cannot read file "$path"', e);
+  }
+}
 
 /// Expand [patterns] into a de-duplicated list of file paths.
 ///
