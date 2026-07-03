@@ -381,9 +381,16 @@ Future<List<String>> expandPaths(List<String> patterns) async {
       seen.add(pattern);
       continue;
     }
-    final glob = Glob(pattern);
-    await for (final entity in glob.list()) {
-      if (entity is File) seen.add(entity.path);
+    // A malformed glob (e.g. an unmatched '[' in a real filename) makes
+    // Glob throw a FormatException. Treat it as "no match" rather than
+    // letting it crash the CLI with an unhandled exception.
+    try {
+      final glob = Glob(pattern);
+      await for (final entity in glob.list()) {
+        if (entity is File) seen.add(entity.path);
+      }
+    } on FormatException {
+      continue;
     }
   }
   final out = seen.toList()..sort();
