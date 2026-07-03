@@ -171,6 +171,13 @@ List<Defect> _detectOnChannel(
 // ---------------------------------------------------------------------------
 
 /// Build a per-sample threshold array using a sliding-window MAD estimate.
+///
+/// Recomputing a full windowed MAD (a copy plus two sorts of ~`windowSize`
+/// elements) for every sample is O(n·w·log w) and makes real-world files
+/// impractically slow. The MAD estimate varies slowly relative to the window,
+/// so it is evaluated on a coarse grid (spaced `windowSize / 8` apart) and
+/// linearly interpolated between grid points — reducing the cost to
+/// O(n·log w) while leaving the threshold effectively unchanged.
 Float32List _buildAdaptiveThreshold(
   Float32List diff,
   int windowSize,
@@ -178,21 +185,48 @@ Float32List _buildAdaptiveThreshold(
 ) {
   final n = diff.length;
   final threshold = Float32List(n);
+  if (n == 0) return threshold;
   final half = windowSize ~/ 2;
+  final hop = math.max(1, windowSize ~/ 8);
 
-  for (int i = 0; i < n; i++) {
+  // Grid indices: 0, hop, 2·hop, … always including the final sample so the
+  // tail is covered by interpolation rather than extrapolation.
+  final gridIndices = <int>[];
+  for (int i = 0; i < n; i += hop) {
+    gridIndices.add(i);
+  }
+  if (gridIndices.last != n - 1) gridIndices.add(n - 1);
+
+  double madThresholdAt(int i) {
     final start = math.max(0, i - half);
     final end = math.min(n, i + half);
     final window = Float32List(end - start);
     for (int j = start; j < end; j++) {
       window[j - start] = diff[j].abs();
     }
-    final madValue = mad(window);
     // MAD → sigma: multiply by consistency factor for normal distribution.
-    threshold[i] = madValue * _kMadScaleFactor * multiplier;
+    final t = mad(window) * _kMadScaleFactor * multiplier;
     // Enforce a minimum floor to avoid spurious detections in digital silence.
-    if (threshold[i] < _kThresholdFloor) threshold[i] = _kThresholdFloor;
+    return t < _kThresholdFloor ? _kThresholdFloor : t;
   }
+
+  final gridThresholds = Float64List(gridIndices.length);
+  for (int g = 0; g < gridIndices.length; g++) {
+    gridThresholds[g] = madThresholdAt(gridIndices[g]);
+  }
+
+  // Linearly interpolate the threshold between adjacent grid points.
+  for (int g = 0; g < gridIndices.length - 1; g++) {
+    final i0 = gridIndices[g];
+    final i1 = gridIndices[g + 1];
+    final t0 = gridThresholds[g];
+    final t1 = gridThresholds[g + 1];
+    final span = i1 - i0;
+    for (int i = i0; i < i1; i++) {
+      threshold[i] = t0 + (t1 - t0) * ((i - i0) / span);
+    }
+  }
+  threshold[n - 1] = gridThresholds[gridThresholds.length - 1];
   return threshold;
 }
 
