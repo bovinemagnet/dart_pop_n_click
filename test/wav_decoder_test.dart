@@ -233,6 +233,19 @@ void main() {
         throwsA(isA<UnsupportedFormatException>()),
       );
     });
+
+    test('throws UnsupportedFormatException for a bit depth of 4', () {
+      // A depth of 1–7 gives bytesPerFrame == 0; without validation this
+      // crashes with an untyped division-by-zero rather than a typed error.
+      final wav = buildWavRaw(
+        rawSampleBytes: Uint8List(4),
+        bitDepth: 4,
+      );
+      expect(
+        () => decodeWav(wav),
+        throwsA(isA<UnsupportedFormatException>()),
+      );
+    });
   });
 
   group('WAV decoder – stereo', () {

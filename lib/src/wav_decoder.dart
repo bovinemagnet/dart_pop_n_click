@@ -85,6 +85,12 @@ WavData decodeWav(Uint8List bytes) {
         'Only PCM (format 1) and IEEE float (format 3) WAV files are '
         'supported. Found audio format $audioFormat.');
   }
+  // Reject bit depths the decoder cannot handle up front. Without this a
+  // depth of 1–7 gives bytesPerFrame == 0 and an untyped division-by-zero
+  // crash in decodePcmBytes (mirrors the AIFF decoder's validation).
+  if (bitDepth != 8 && bitDepth != 16 && bitDepth != 24 && bitDepth != 32) {
+    throw UnsupportedFormatException('Unsupported WAV bit depth: $bitDepth.');
+  }
 
   // ---- Decode samples -------------------------------------------------------
   final pcmFormat = PcmFormat(
