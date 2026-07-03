@@ -17,7 +17,8 @@ import 'detector.dart';
 /// Analyse the audio file at [path] and return an [AnalysisResult].
 ///
 /// The format is auto-detected from the file extension (`.wav`, `.aiff`, `.aif`,
-/// `.aifc`, `.flac`) and validated against the file's magic bytes.  A [config]
+/// `.aifc`, `.flac`) and validated against the file's magic bytes.  Pass
+/// [format] to force a specific decoder and skip auto-detection.  A [config]
 /// can be passed to tune sensitivity and filtering.
 ///
 /// Throws:
@@ -27,6 +28,7 @@ import 'detector.dart';
 Future<AnalysisResult> analyseFile(
   String path, {
   DetectorConfig config = const DetectorConfig(),
+  AudioFileFormat? format,
 }) async {
   final Uint8List bytes;
   try {
@@ -40,13 +42,14 @@ Future<AnalysisResult> analyseFile(
     throw UnsupportedFormatException('File too large (max 2 GB).');
   }
 
-  return analyseBytes(bytes, path: path, config: config);
+  return analyseBytes(bytes, path: path, config: config, format: format);
 }
 
 /// Analyse raw audio [bytes] and return an [AnalysisResult].
 ///
 /// [path] is optional and used only for format detection by extension.
 /// If [path] is omitted the bytes themselves are inspected (magic bytes).
+/// Pass [format] to force a specific decoder and skip auto-detection.
 ///
 /// Throws:
 /// - [UnsupportedFormatException] if the format is not supported.
@@ -55,15 +58,16 @@ AnalysisResult analyseBytes(
   Uint8List bytes, {
   String? path,
   DetectorConfig config = const DetectorConfig(),
+  AudioFileFormat? format,
 }) {
-  final format = _detectFormat(bytes, path);
+  final resolved = format ?? _detectFormat(bytes, path);
 
-  switch (format) {
-    case _AudioFormat.wav:
+  switch (resolved) {
+    case AudioFileFormat.wav:
       return _analyseWav(bytes, config);
-    case _AudioFormat.aiff:
+    case AudioFileFormat.aiff:
       return _analyseAiff(bytes, config);
-    case _AudioFormat.flac:
+    case AudioFileFormat.flac:
       return _analyseFlac(bytes, config);
   }
 }
@@ -180,9 +184,19 @@ AnalysisResult _buildResult(
 // Internal helpers
 // ---------------------------------------------------------------------------
 
-enum _AudioFormat { wav, aiff, flac }
+/// A supported container format, used to override magic-byte auto-detection.
+enum AudioFileFormat {
+  /// RIFF/WAVE PCM or IEEE float.
+  wav,
 
-_AudioFormat _detectFormat(Uint8List bytes, String? path) {
+  /// AIFF / AIFF-C.
+  aiff,
+
+  /// Native FLAC stream.
+  flac,
+}
+
+AudioFileFormat _detectFormat(Uint8List bytes, String? path) {
   // Magic bytes check takes priority
   if (bytes.length >= 4) {
     // FLAC: "fLaC" stream marker at offset 0.
@@ -191,7 +205,7 @@ _AudioFormat _detectFormat(Uint8List bytes, String? path) {
         bytes[2] == 0x61 && // a
         bytes[3] == 0x43) {
       // C
-      return _AudioFormat.flac;
+      return AudioFileFormat.flac;
     }
     // Ogg container ("OggS"): Ogg-encapsulated FLAC/Vorbis is not supported.
     if (bytes[0] == 0x4F && // O
@@ -214,7 +228,7 @@ _AudioFormat _detectFormat(Uint8List bytes, String? path) {
         bytes[9] == 0x41 && // A
         bytes[10] == 0x56 && // V
         bytes[11] == 0x45; // E
-    if (isRiff && isWave) return _AudioFormat.wav;
+    if (isRiff && isWave) return AudioFileFormat.wav;
 
     // AIFF: "FORM" at 0-3, "AIFF" or "AIFC" at 8-11
     if (bytes[0] == 0x46 &&
@@ -229,7 +243,7 @@ _AudioFormat _detectFormat(Uint8List bytes, String? path) {
               bytes[9] == 0x49 &&
               bytes[10] == 0x46 &&
               bytes[11] == 0x43)) {
-        return _AudioFormat.aiff;
+        return AudioFileFormat.aiff;
       }
     }
   }
@@ -239,11 +253,11 @@ _AudioFormat _detectFormat(Uint8List bytes, String? path) {
     final ext = path.toLowerCase().split('.').last;
     switch (ext) {
       case 'wav':
-        return _AudioFormat.wav;
+        return AudioFileFormat.wav;
       case 'aiff' || 'aif' || 'aifc':
-        return _AudioFormat.aiff;
+        return AudioFileFormat.aiff;
       case 'flac':
-        return _AudioFormat.flac;
+        return AudioFileFormat.flac;
     }
   }
 
