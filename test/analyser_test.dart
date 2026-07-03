@@ -696,5 +696,55 @@ void main() {
       expect(result.dcOffsetPerChannel, isNotNull);
       expect(result.dcOffsetPerChannel.length, equals(1));
     });
+
+    test('minConfidence suppresses low-confidence clipping defects', () {
+      const sampleRate = 44100;
+      final floats = List<double>.generate(
+        sampleRate,
+        (i) => 0.3 * math.sin(2 * math.pi * 440 * i / sampleRate),
+      );
+      // A 3-sample clip run scores a low clipping confidence (~0.3).
+      for (var i = 10000; i < 10003; i++) {
+        floats[i] = 1.0;
+      }
+      final wav = buildWav16MonoFromFloats(floats, sampleRate: sampleRate);
+
+      // Without a confidence floor the clipping defect is reported.
+      final unfiltered = analyseBytes(wav);
+      expect(
+          unfiltered.defects.any((d) => d.type == DefectType.clipping), isTrue);
+
+      // With a high minConfidence the same clipping defect must be suppressed.
+      final filtered = analyseBytes(
+        wav,
+        config: const DetectorConfig(minConfidence: 0.9),
+      );
+      expect(
+          filtered.defects.any((d) => d.type == DefectType.clipping), isFalse);
+    });
+
+    test('maxDefects caps the combined defect list', () {
+      const sampleRate = 44100;
+      final floats = List<double>.generate(
+        sampleRate,
+        (i) => 0.3 * math.sin(2 * math.pi * 440 * i / sampleRate),
+      );
+      // Several well-separated clip runs so more than one defect is produced.
+      for (final start in [5000, 15000, 25000, 35000]) {
+        for (var i = start; i < start + 20; i++) {
+          floats[i] = 1.0;
+        }
+      }
+      final wav = buildWav16MonoFromFloats(floats, sampleRate: sampleRate);
+
+      final unlimited = analyseBytes(wav);
+      expect(unlimited.defects.length, greaterThan(1));
+
+      final capped = analyseBytes(
+        wav,
+        config: const DetectorConfig(maxDefects: 1),
+      );
+      expect(capped.defects.length, equals(1));
+    });
   });
 }

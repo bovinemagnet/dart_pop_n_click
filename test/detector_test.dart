@@ -551,6 +551,28 @@ void main() {
       expect(json.containsKey('amplitude'), isTrue);
     });
   });
+
+  group('detectDefects – performance', () {
+    test('10s of 44.1 kHz audio analyses well within realtime', () {
+      // With the previous per-sample MAD recomputation this buffer took on the
+      // order of ten seconds; the coarse-grid threshold brings it far below
+      // realtime. The 5s bound is generous to stay stable across CI machines.
+      const n = sampleRate * 10;
+      final buf = sineWave(n, freq: 440);
+      injectClick(buf, n ~/ 2, amplitude: 0.95);
+
+      final sw = Stopwatch()..start();
+      final defects = detectDefects([buf], sampleRate, highConfig);
+      sw.stop();
+
+      expect(sw.elapsed, lessThan(const Duration(seconds: 5)));
+      // The injected click is still detected after the optimisation.
+      expect(
+        defects.where((d) => (d.sampleIndex - n ~/ 2).abs() <= 50),
+        isNotEmpty,
+      );
+    });
+  });
 }
 
 // ---------------------------------------------------------------------------

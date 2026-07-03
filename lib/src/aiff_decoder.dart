@@ -252,7 +252,9 @@ Int16List _buildALawTable() {
     } else {
       sample = ((mantissa << 4) + 0x108) << (exponent - 1);
     }
-    t[i] = sign ? -sample : sample;
+    // G.711: the magnitude is positive when the (post-XOR) sign bit is set,
+    // negative otherwise. Getting this backwards inverts the whole waveform.
+    t[i] = sign ? sample : -sample;
   }
   return t;
 }

@@ -85,6 +85,13 @@ WavData decodeWav(Uint8List bytes) {
         'Only PCM (format 1) and IEEE float (format 3) WAV files are '
         'supported. Found audio format $audioFormat.');
   }
+  // The float decoder only reads 32-bit IEEE floats; a float file with any
+  // other sample size (e.g. 64-bit double) would be silently mis-decoded.
+  if (audioFormat == 3 && bitDepth != 32) {
+    throw UnsupportedFormatException(
+        'Only 32-bit IEEE float WAV files are supported. '
+        'Found float sample size $bitDepth-bit.');
+  }
   // Reject bit depths the decoder cannot handle up front. Without this a
   // depth of 1–7 gives bytesPerFrame == 0 and an untyped division-by-zero
   // crash in decodePcmBytes (mirrors the AIFF decoder's validation).

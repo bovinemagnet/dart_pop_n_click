@@ -491,6 +491,29 @@ void main() {
       expect(data.samples[0][0], closeTo(1.0, 1e-6));
       expect(data.samples[0][1], closeTo(-1.0, 1e-6));
     });
+
+    test('64-bit float is rejected rather than mis-decoded', () {
+      // The float decoder only handles 32-bit samples. A 64-bit float file
+      // must fail loudly instead of silently reading garbage at a 4-byte
+      // stride.
+      final raw = Uint8List(16); // two float64 words
+      final wav = buildWavRaw(
+        rawSampleBytes: raw,
+        bitDepth: 64,
+        audioFormat: 3,
+      );
+      expect(() => decodeWav(wav), throwsA(isA<UnsupportedFormatException>()));
+    });
+
+    test('16-bit float is rejected', () {
+      final raw = Uint8List(4);
+      final wav = buildWavRaw(
+        rawSampleBytes: raw,
+        bitDepth: 16,
+        audioFormat: 3,
+      );
+      expect(() => decodeWav(wav), throwsA(isA<UnsupportedFormatException>()));
+    });
   });
 
   group('WAV decoder – odd chunk padding', () {
