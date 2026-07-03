@@ -385,7 +385,7 @@ Future<List<String>> expandPaths(List<String> patterns) async {
     // Glob throw a FormatException. Treat it as "no match" rather than
     // letting it crash the CLI with an unhandled exception.
     try {
-      final glob = Glob(pattern);
+      final glob = Glob(normaliseGlobPattern(pattern));
       await for (final entity in glob.list()) {
         if (entity is File) seen.add(entity.path);
       }
@@ -395,6 +395,19 @@ Future<List<String>> expandPaths(List<String> patterns) async {
   }
   final out = seen.toList()..sort();
   return out;
+}
+
+/// Normalise a glob [pattern]'s path separators for `package:glob`.
+///
+/// On Windows the shell separator is `\`, but `package:glob` treats `\` as an
+/// escape character, so `recordings\*.wav` would never match. Convert
+/// backslashes to forward slashes on Windows only; on POSIX `\` is a legitimate
+/// escape and is left untouched.
+///
+/// [windows] overrides platform detection (used by tests).
+String normaliseGlobPattern(String pattern, {bool? windows}) {
+  final onWindows = windows ?? Platform.isWindows;
+  return onWindows ? pattern.replaceAll(r'\', '/') : pattern;
 }
 
 // ---------------------------------------------------------------------------
