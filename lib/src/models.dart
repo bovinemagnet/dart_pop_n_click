@@ -12,7 +12,7 @@ enum DefectType {
   /// A very short transient spike (1–10 samples).
   click,
 
-  /// A slightly wider transient burst (10–150 samples).
+  /// A slightly wider transient burst (11–150 samples).
   pop,
 
   /// A run of consecutive samples saturated at or near full scale.
@@ -44,9 +44,10 @@ class DetectorConfig {
   /// Maximum number of defects to return (0 = unlimited).
   final int maxDefects;
 
-  /// When true the algorithm analyses each channel independently and annotates
-  /// results with a channel index.  When false samples are summed to mono
-  /// before analysis.
+  /// When true the click/pop and dropout detectors analyse each channel
+  /// independently and annotate results with a channel index.  When false
+  /// samples are summed to mono before analysis.  Clipping detection is
+  /// always per-channel (saturation is inherently a per-channel property).
   final bool perChannel;
 
   /// Absolute sample magnitude considered clipping (default 0.99).

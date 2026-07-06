@@ -69,6 +69,10 @@ WavData decodeWav(Uint8List bytes) {
             reader.skip(4);
             audioFormat = reader.readUint16Le();
             reader.skip(14); // remainder of the GUID
+            // Skip any extension bytes beyond the GUID (cbSize > 22) so the
+            // reader stays aligned with the next chunk. 40 bytes consumed:
+            // 16 standard + 2 cbSize + 22 extension.
+            if (chunkSize > 40) reader.skip(chunkSize - 40);
           } else {
             reader.skip(chunkSize - 18); // 2 bytes already consumed for cbSize
           }

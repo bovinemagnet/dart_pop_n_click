@@ -7,7 +7,7 @@
 ///    to obtain an adaptive local-noise estimate.
 /// 3. Flag any sample whose |d| exceeds `thresholdMultiplier * MAD`.
 /// 4. Merge consecutive flagged samples into contiguous defect regions.
-/// 5. Classify each region as a *click* (1–10 samples) or *pop* (10–150 samples).
+/// 5. Classify each region as a *click* (1–10 samples) or *pop* (11–150 samples).
 ///    Regions wider than 150 samples are discarded (likely legitimate transients
 ///    such as drum hits).
 /// 6. Compute a confidence score for each defect using a logistic function
@@ -72,12 +72,15 @@ List<Defect> detectDefects(
   // Sort by offset
   allDefects.sort((a, b) => a.offset.compareTo(b.offset));
 
-  // Apply minConfidence filter
-  final filtered = config.minConfidence > 0
-      ? allDefects.where((d) => d.confidence >= config.minConfidence).toList()
-      : allDefects;
+  return applyDefectLimits(allDefects, config);
+}
 
-  // Apply maxDefects limit
+/// Apply the [DetectorConfig.minConfidence] threshold and
+/// [DetectorConfig.maxDefects] cap to an offset-sorted defect list.
+List<Defect> applyDefectLimits(List<Defect> defects, DetectorConfig config) {
+  final filtered = config.minConfidence > 0
+      ? defects.where((d) => d.confidence >= config.minConfidence).toList()
+      : defects;
   if (config.maxDefects > 0 && filtered.length > config.maxDefects) {
     return filtered.sublist(0, config.maxDefects);
   }
@@ -293,10 +296,6 @@ double computeAggregateConfidence(List<Defect> defects) {
 }
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-// ---------------------------------------------------------------------------
 // Clipping detection
 // ---------------------------------------------------------------------------
 
@@ -364,15 +363,54 @@ List<Defect> detectClipping(
 /// between [minMs] and [maxMs] (inclusive) and that is bordered on both
 /// sides by non-silent samples. Runs at the very start or end of the
 /// signal are ignored (they could be intentional leading/trailing silence).
+///
+/// When [perChannel] is true each channel is scanned independently and
+/// defects carry their channel index; otherwise channels are summed to mono
+/// first and defects are reported as channel 0. A dropout present in only
+/// one channel can be masked by the mono sum, so per-channel scanning is
+/// more sensitive on multi-channel audio.
 List<Defect> detectDropouts(
   List<Float32List> channels,
   int sampleRate, {
   double silenceThreshold = 1e-4,
   double minMs = 1.0,
   double maxMs = 50.0,
+  bool perChannel = false,
 }) {
   if (channels.isEmpty) return [];
+  if (perChannel) {
+    final List<Defect> defects = [];
+    for (int ch = 0; ch < channels.length; ch++) {
+      defects.addAll(_dropoutsOnChannel(
+        channels[ch],
+        sampleRate,
+        ch,
+        silenceThreshold: silenceThreshold,
+        minMs: minMs,
+        maxMs: maxMs,
+      ));
+    }
+    return defects;
+  }
   final mono = channels.length == 1 ? channels[0] : _sumToMono(channels);
+  return _dropoutsOnChannel(
+    mono,
+    sampleRate,
+    0,
+    silenceThreshold: silenceThreshold,
+    minMs: minMs,
+    maxMs: maxMs,
+  );
+}
+
+List<Defect> _dropoutsOnChannel(
+  Float32List mono,
+  int sampleRate,
+  int channelIndex, {
+  required double silenceThreshold,
+  required double minMs,
+  required double maxMs,
+}) {
   final n = mono.length;
   if (n < 3) return [];
 
@@ -417,7 +455,7 @@ List<Defect> detectDropouts(
           length: Duration(milliseconds: lengthMs),
           type: DefectType.dropout,
           confidence: confidence,
-          channel: 0,
+          channel: channelIndex,
           sampleIndex: runStart,
           amplitude: 0.0,
         ));

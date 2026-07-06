@@ -30,16 +30,25 @@ Future<AnalysisResult> analyseFile(
   DetectorConfig config = const DetectorConfig(),
   AudioFileFormat? format,
 }) async {
-  final Uint8List bytes;
+  final file = File(path);
+
+  // Guard against excessively large files (>2 GB) before loading anything
+  // into memory.
+  final int length;
   try {
-    bytes = await File(path).readAsBytes();
+    length = await file.length();
   } catch (e) {
     throw IoException('Cannot read file "$path"', e);
   }
-
-  // Guard against excessively large files (>2 GB).
-  if (bytes.length > 2 * 1024 * 1024 * 1024) {
+  if (length > 2 * 1024 * 1024 * 1024) {
     throw UnsupportedFormatException('File too large (max 2 GB).');
+  }
+
+  final Uint8List bytes;
+  try {
+    bytes = await file.readAsBytes();
+  } catch (e) {
+    throw IoException('Cannot read file "$path"', e);
   }
 
   return analyseBytes(bytes, path: path, config: config, format: format);
@@ -158,6 +167,7 @@ AnalysisResult _buildResult(
       silenceThreshold: config.dropoutSilenceThreshold,
       minMs: config.dropoutMinMs,
       maxMs: config.dropoutMaxMs,
+      perChannel: config.perChannel,
     ));
   }
 
@@ -167,7 +177,7 @@ AnalysisResult _buildResult(
   // clipping and dropout defects are appended here afterwards. Apply the same
   // limits to the combined list so every reported defect honours the config
   // (matching the AnalysisResult.defects contract).
-  final reported = _applyLimits(allDefects, config);
+  final reported = applyDefectLimits(allDefects, config);
 
   List<double> dcOffsets = const [];
   if (config.detectDcOffset) {
@@ -189,18 +199,6 @@ AnalysisResult _buildResult(
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
-
-/// Apply the [DetectorConfig.minConfidence] threshold and
-/// [DetectorConfig.maxDefects] cap to an offset-sorted defect list.
-List<Defect> _applyLimits(List<Defect> defects, DetectorConfig config) {
-  final filtered = config.minConfidence > 0
-      ? defects.where((d) => d.confidence >= config.minConfidence).toList()
-      : defects;
-  if (config.maxDefects > 0 && filtered.length > config.maxDefects) {
-    return filtered.sublist(0, config.maxDefects);
-  }
-  return filtered;
-}
 
 /// A supported container format, used to override magic-byte auto-detection.
 enum AudioFileFormat {

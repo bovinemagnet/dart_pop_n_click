@@ -509,6 +509,47 @@ void main() {
       final defects = detectDropouts([samples], 44100);
       expect(defects, isEmpty);
     });
+
+    test('perChannel: dropout on one channel of stereo attributed correctly',
+        () {
+      final n = 44100;
+      Float32List sine() {
+        final s = Float32List(n);
+        for (var i = 0; i < n; i++) {
+          s[i] = 0.5 * math.sin(2 * math.pi * 440 * i / 44100);
+        }
+        return s;
+      }
+
+      final left = sine();
+      final right = sine();
+      // ~10ms of silence in the right channel only; the mono sum would
+      // stay non-silent, so only per-channel analysis can find this.
+      for (var i = 22000; i < 22441; i++) {
+        right[i] = 0;
+      }
+      final defects = detectDropouts([left, right], 44100, perChannel: true);
+      expect(defects, isNotEmpty);
+      expect(defects.every((d) => d.channel == 1), isTrue);
+    });
+
+    test('mono-summed stereo (default) reports dropouts as channel 0', () {
+      final n = 44100;
+      final left = Float32List(n);
+      final right = Float32List(n);
+      for (var i = 0; i < n; i++) {
+        left[i] = 0.5 * math.sin(2 * math.pi * 440 * i / 44100);
+        right[i] = left[i];
+      }
+      // Silence in both channels so the mono sum is silent too.
+      for (var i = 22000; i < 22441; i++) {
+        left[i] = 0;
+        right[i] = 0;
+      }
+      final defects = detectDropouts([left, right], 44100);
+      expect(defects, isNotEmpty);
+      expect(defects.first.channel, equals(0));
+    });
   });
 
   group('computeDcOffsets', () {
