@@ -5,26 +5,24 @@ import 'package:test/test.dart';
 
 import '../bin/audiodefect.dart' as cli;
 
+/// Strip leading `./` and normalise separators so assertions are platform-agnostic.
+List<String> _norm(List<String> paths) => paths
+    .map((p) => p.replaceAll(r'\', '/').replaceAll(RegExp(r'^\./'), ''))
+    .toList();
+
 void main() {
   late Directory tmp;
+  late String prev;
 
-  /// Prefix a relative [pattern] with the temp directory so the test never
-  /// depends on the process-wide `Directory.current` (mutating it races with
-  /// other concurrently running test suites).
-  String inTmp(String pattern) => '${tmp.path}/$pattern';
-
-  /// Strip the temp-dir prefix and normalise separators so assertions are
-  /// platform-agnostic.
-  List<String> norm(List<String> paths) {
-    final prefix = '${tmp.path.replaceAll(r'\', '/')}/';
-    return paths
-        .map((p) => p.replaceAll(r'\', '/'))
-        .map((p) => p.startsWith(prefix) ? p.substring(prefix.length) : p)
-        .toList();
-  }
-
+  // This suite is the only one that mutates the process-wide
+  // `Directory.current` (other suites resolve paths independently of cwd —
+  // see test/package_root.dart — specifically so this doesn't race them).
+  // Absolute glob patterns are avoided because `package:glob` parses
+  // patterns with POSIX syntax; a Windows drive-letter root doesn't resolve
+  // through it, so relative patterns + chdir is required cross-platform.
   setUp(() async {
     tmp = await Directory.systemTemp.createTemp('audiodefect_glob_');
+    prev = Directory.current.path;
     File('${tmp.path}/a.wav').writeAsStringSync('x');
     File('${tmp.path}/b.wav').writeAsStringSync('x');
     File('${tmp.path}/c.txt').writeAsStringSync('x');
@@ -32,47 +30,49 @@ void main() {
     File('${tmp.path}/sub1/d.wav').writeAsStringSync('x');
     Directory('${tmp.path}/sub2').createSync();
     File('${tmp.path}/sub2/e.wav').writeAsStringSync('x');
+    Directory.current = tmp.path;
   });
 
   tearDown(() async {
+    Directory.current = prev;
     await tmp.delete(recursive: true);
   });
 
   test('literal existing file passes through', () async {
-    final r = norm(await cli.expandPaths([inTmp('a.wav')]));
+    final r = _norm(await cli.expandPaths(['a.wav']));
     expect(r, equals(['a.wav']));
   });
 
   test('single-star glob matches top-level', () async {
-    final r = norm(await cli.expandPaths([inTmp('*.wav')]));
+    final r = _norm(await cli.expandPaths(['*.wav']));
     expect(r, containsAll(['a.wav', 'b.wav']));
     expect(r.where((p) => p.endsWith('c.txt')), isEmpty);
     expect(r.where((p) => p.contains('sub1')), isEmpty);
   });
 
   test('recursive glob matches nested files', () async {
-    final r = norm(await cli.expandPaths([inTmp('**/*.wav')]));
+    final r = _norm(await cli.expandPaths(['**/*.wav']));
     expect(r, containsAll(['sub1/d.wav', 'sub2/e.wav']));
   });
 
   test('brace expansion', () async {
-    final r = norm(await cli.expandPaths([inTmp('{a,b}.wav')]));
+    final r = _norm(await cli.expandPaths(['{a,b}.wav']));
     expect(r..sort(), equals(['a.wav', 'b.wav']));
   });
 
   test('character class', () async {
-    final r = norm(await cli.expandPaths([inTmp('[ab].wav')]));
+    final r = _norm(await cli.expandPaths(['[ab].wav']));
     expect(r..sort(), equals(['a.wav', 'b.wav']));
   });
 
   test('non-matching pattern returns empty', () async {
-    final r = await cli.expandPaths([inTmp('nope_*.xyz')]);
+    final r = await cli.expandPaths(['nope_*.xyz']);
     expect(r, isEmpty);
   });
 
   group('readRawBytes', () {
     test('reads an existing file', () async {
-      final bytes = await cli.readRawBytes(inTmp('a.wav'));
+      final bytes = await cli.readRawBytes('a.wav');
       expect(bytes, isNotEmpty);
     });
 
@@ -81,7 +81,7 @@ void main() {
       // CLI must surface it as the library IoException (caught -> exit 3),
       // not crash with an unhandled exception.
       expect(
-        () => cli.readRawBytes(inTmp('sub1')),
+        () => cli.readRawBytes('sub1'),
         throwsA(isA<IoException>()),
       );
     });
@@ -90,7 +90,7 @@ void main() {
   test('malformed glob pattern returns empty instead of throwing', () async {
     // Unmatched '[' is invalid glob syntax; package:glob throws a
     // FormatException. The CLI must treat it as "no match", not crash.
-    final r = await cli.expandPaths([inTmp('track[1.wav')]);
+    final r = await cli.expandPaths(['track[1.wav']);
     expect(r, isEmpty);
   });
 
@@ -98,7 +98,7 @@ void main() {
     // If a file literally named with the malformed pattern exists, the
     // literal fast-path should still find it.
     File('${tmp.path}/lit[.wav').writeAsStringSync('x');
-    final r = norm(await cli.expandPaths([inTmp('lit[.wav')]));
+    final r = _norm(await cli.expandPaths(['lit[.wav']));
     expect(r, equals(['lit[.wav']));
   });
 
