@@ -1,6 +1,7 @@
 /// Audio defect detector — public library entry point.
 ///
-/// Detects pops and clicks in WAV audio files.
+/// Detects pops, clicks, clipping, dropouts, and DC offset in WAV, AIFF
+/// and FLAC audio files.
 ///
 /// Example:
 /// ```dart
@@ -14,7 +15,7 @@
 ///   }
 /// }
 /// ```
-library audio_defect_detector;
+library;
 
 export 'src/aiff_decoder.dart';
 export 'src/analyser.dart';

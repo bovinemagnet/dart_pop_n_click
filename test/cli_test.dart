@@ -1,8 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:test/test.dart';
+
+import 'package_root.dart';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -14,18 +17,16 @@ Future<ProcessResult> runCli(List<String> args) async {
   return Process.run(
     'dart',
     ['run', 'bin/audiodefect.dart', ...args],
-    workingDirectory: _projectRoot,
+    workingDirectory: (await packageRootUri()).toFilePath(),
   );
 }
 
-/// Absolute path to the project root so that `dart run` resolves correctly
-/// regardless of the working directory the test runner uses.
-final String _projectRoot = Directory.current.path;
-
-/// Create a temporary WAV file (16-bit mono PCM) containing [samples].
+/// Create a temporary WAV file (16-bit PCM) containing interleaved [samples].
 ///
+/// [channels] is the number of interleaved channels (default mono).
 /// The caller is responsible for deleting the parent temp directory when done.
-File createTestWav(List<int> samples, {int sampleRate = 44100}) {
+File createTestWav(List<int> samples,
+    {int sampleRate = 44100, int channels = 1}) {
   final numSamples = samples.length;
   final dataSize = numSamples * 2; // 16-bit = 2 bytes per sample
   final fileSize = 44 + dataSize; // 44-byte header + data
@@ -50,10 +51,10 @@ File createTestWav(List<int> samples, {int sampleRate = 44100}) {
   bd.setUint8(15, 0x20); // (space)
   bd.setUint32(16, 16, Endian.little); // sub-chunk size
   bd.setUint16(20, 1, Endian.little); // PCM format
-  bd.setUint16(22, 1, Endian.little); // mono
+  bd.setUint16(22, channels, Endian.little);
   bd.setUint32(24, sampleRate, Endian.little);
-  bd.setUint32(28, sampleRate * 2, Endian.little); // byte rate
-  bd.setUint16(32, 2, Endian.little); // block align
+  bd.setUint32(28, sampleRate * 2 * channels, Endian.little); // byte rate
+  bd.setUint16(32, 2 * channels, Endian.little); // block align
   bd.setUint16(34, 16, Endian.little); // bits per sample
 
   // data sub-chunk
@@ -71,6 +72,20 @@ File createTestWav(List<int> samples, {int sampleRate = 44100}) {
   final file = File('${tmpDir.path}/test.wav');
   file.writeAsBytesSync(bd.buffer.asUint8List());
   return file;
+}
+
+/// Create a temporary WAV file (16-bit stereo PCM) from per-channel samples.
+File createTestWavStereo(
+  List<int> left,
+  List<int> right, {
+  int sampleRate = 44100,
+}) {
+  final interleaved = List<int>.filled(left.length * 2, 0);
+  for (var i = 0; i < left.length; i++) {
+    interleaved[i * 2] = left[i];
+    interleaved[i * 2 + 1] = right[i];
+  }
+  return createTestWav(interleaved, sampleRate: sampleRate, channels: 2);
 }
 
 /// Create a temporary AIFF file (16-bit mono PCM) containing [samples].
@@ -342,6 +357,148 @@ void main() {
         expect(result.exitCode, equals(0));
         // Verbose writes diagnostics to stderr.
         expect(result.stderr.toString(), contains('Analysing'));
+      } finally {
+        file.parent.deleteSync(recursive: true);
+      }
+    });
+  });
+
+  // -----------------------------------------------------------------------
+  // Detector configuration options
+  // -----------------------------------------------------------------------
+
+  group('CLI – detector configuration options', () {
+    /// Decode the JSON envelope of a single-file run.
+    Map<String, dynamic> resultJson(ProcessResult result) =>
+        (jsonDecode(result.stdout.toString()) as Map<String, dynamic>)['result']
+            as Map<String, dynamic>;
+
+    test('--max-defects caps the number of reported defects', () async {
+      final samples = List.filled(44100, 0);
+      // Two well-separated clicks.
+      samples[10000] = 32767;
+      samples[10001] = -32768;
+      samples[30000] = 32767;
+      samples[30001] = -32768;
+      final file = createTestWav(samples);
+      try {
+        final all = await runCli(['analyse', file.path, '--output=json']);
+        expect(resultJson(all)['defect_count'], greaterThan(1));
+
+        final capped = await runCli(
+            ['analyse', file.path, '--output=json', '--max-defects=1']);
+        expect(resultJson(capped)['defect_count'], equals(1));
+      } finally {
+        file.parent.deleteSync(recursive: true);
+      }
+    });
+
+    test('--per-channel attributes defects to their channel', () async {
+      final n = 44100;
+      final left = List.filled(n, 0);
+      final right = List.filled(n, 0);
+      right[22050] = 32767;
+      right[22051] = -32768;
+      final file = createTestWavStereo(left, right);
+      try {
+        final result = await runCli(
+            ['analyse', file.path, '--output=json', '--per-channel']);
+        final defects = resultJson(result)['defects'] as List;
+        expect(defects, isNotEmpty);
+        expect(defects.every((d) => d['channel'] == 1), isTrue);
+      } finally {
+        file.parent.deleteSync(recursive: true);
+      }
+    });
+
+    test('--no-clipping suppresses clipping defects', () async {
+      final samples = List.filled(44100, 0);
+      // A 50-sample full-scale run: unambiguous clipping.
+      for (var i = 22050; i < 22100; i++) {
+        samples[i] = 32767;
+      }
+      final file = createTestWav(samples);
+      try {
+        final all = await runCli(['analyse', file.path, '--output=json']);
+        final allTypes =
+            (resultJson(all)['defects'] as List).map((d) => d['type']).toSet();
+        expect(allTypes, contains('clipping'));
+
+        final suppressed = await runCli(
+            ['analyse', file.path, '--output=json', '--no-clipping']);
+        final types = (resultJson(suppressed)['defects'] as List)
+            .map((d) => d['type'])
+            .toSet();
+        expect(types, isNot(contains('clipping')));
+      } finally {
+        file.parent.deleteSync(recursive: true);
+      }
+    });
+
+    test('--no-dropouts suppresses dropout defects', () async {
+      final samples = List<int>.generate(
+        44100,
+        (i) => (0.5 * 32767 * math.sin(2 * math.pi * 440 * i / 44100)).round(),
+      );
+      // ~10ms of silence mid-signal: a dropout.
+      for (var i = 22000; i < 22441; i++) {
+        samples[i] = 0;
+      }
+      final file = createTestWav(samples);
+      try {
+        final all = await runCli(['analyse', file.path, '--output=json']);
+        final allTypes =
+            (resultJson(all)['defects'] as List).map((d) => d['type']).toSet();
+        expect(allTypes, contains('dropout'));
+
+        final suppressed = await runCli(
+            ['analyse', file.path, '--output=json', '--no-dropouts']);
+        final types = (resultJson(suppressed)['defects'] as List)
+            .map((d) => d['type'])
+            .toSet();
+        expect(types, isNot(contains('dropout')));
+      } finally {
+        file.parent.deleteSync(recursive: true);
+      }
+    });
+
+    test('--no-dc-offset suppresses DC offset reporting', () async {
+      // Constant +0.1 bias: no transients, just DC offset.
+      final samples = List.filled(44100, 3277);
+      final file = createTestWav(samples);
+      try {
+        final all = await runCli(['analyse', file.path, '--output=json']);
+        final dc = resultJson(all)['dc_offset_per_channel'] as List;
+        expect(dc, isNotEmpty);
+        expect((dc.first as num).abs(), greaterThan(0.05));
+
+        final suppressed = await runCli(
+            ['analyse', file.path, '--output=json', '--no-dc-offset']);
+        expect(
+            resultJson(suppressed)['dc_offset_per_channel'] as List, isEmpty);
+      } finally {
+        file.parent.deleteSync(recursive: true);
+      }
+    });
+
+    test('--verbose text output includes DC offset', () async {
+      // Constant +0.1 bias: reported DC offset should appear in verbose text.
+      final samples = List.filled(44100, 3277);
+      final file = createTestWav(samples);
+      try {
+        final result = await runCli(['analyse', file.path, '--verbose']);
+        expect(result.stdout.toString(), contains('DC offset'));
+      } finally {
+        file.parent.deleteSync(recursive: true);
+      }
+    });
+
+    test('invalid --max-defects exits 2', () async {
+      final file = createTestWav(List.filled(4410, 0));
+      try {
+        final result =
+            await runCli(['analyse', file.path, '--max-defects=abc']);
+        expect(result.exitCode, equals(2));
       } finally {
         file.parent.deleteSync(recursive: true);
       }

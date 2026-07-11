@@ -60,6 +60,23 @@ Future<void> main(List<String> args) async {
           defaultsTo: '0.0',
         )
         ..addOption(
+          'max-defects',
+          help: 'Maximum number of defects to report (0 = unlimited).',
+          defaultsTo: '0',
+        )
+        ..addFlag('per-channel',
+            help: 'Analyse each channel independently instead of summing '
+                'to mono.',
+            negatable: false)
+        ..addFlag('clipping',
+            help: 'Detect clipping (hard digital saturation).',
+            defaultsTo: true)
+        ..addFlag('dropouts',
+            help: 'Detect dropouts (brief unexpected silence).',
+            defaultsTo: true)
+        ..addFlag('dc-offset',
+            help: 'Report per-channel DC offset.', defaultsTo: true)
+        ..addOption(
           'threshold',
           abbr: 't',
           help:
@@ -148,6 +165,11 @@ Future<void> _runAnalyse(ArgResults cmd) async {
   final minConfidence =
       _parseDouble(cmd['min-confidence'] as String, 'min-confidence');
   final threshold = _parseDouble(cmd['threshold'] as String, 'threshold');
+  final maxDefects = int.tryParse(cmd['max-defects'] as String);
+  if (maxDefects == null || maxDefects < 0) {
+    stderr.writeln('Error: --max-defects must be a non-negative integer.');
+    exit(_exitUsageError);
+  }
   final isRaw = cmd['raw'] as bool;
   final isFloat = cmd['float'] as bool;
 
@@ -186,6 +208,11 @@ Future<void> _runAnalyse(ArgResults cmd) async {
   final config = DetectorConfig(
     sensitivity: sensitivity,
     minConfidence: minConfidence,
+    maxDefects: maxDefects,
+    perChannel: cmd['per-channel'] as bool,
+    detectClipping: cmd['clipping'] as bool,
+    detectDropouts: cmd['dropouts'] as bool,
+    detectDcOffset: cmd['dc-offset'] as bool,
   );
 
   // Optional format override (skips magic-byte auto-detection).
@@ -323,6 +350,11 @@ void _printText(String path, AnalysisResult result, {bool verbose = false}) {
       '${_fmtDuration(meta.duration)}');
   stdout.writeln(
       'Score: aggregate confidence = ${result.aggregateConfidence.toStringAsFixed(3)}');
+  if (verbose && result.dcOffsetPerChannel.isNotEmpty) {
+    final offsets =
+        result.dcOffsetPerChannel.map((v) => v.toStringAsFixed(4)).join(', ');
+    stdout.writeln('DC offset per channel: $offsets');
+  }
   if (result.defects.isEmpty) {
     stdout.writeln('Result: No defects detected.\n');
     return;

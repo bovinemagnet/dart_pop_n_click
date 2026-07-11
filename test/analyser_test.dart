@@ -391,6 +391,32 @@ void main() {
       expect(result.metadata.channels, equals(1));
       expect(result.metadata.duration, equals(Duration.zero));
     });
+
+    test('perChannel config finds a single-channel dropout with its index',
+        () async {
+      const sampleRate = 44100;
+      final left = Float32List(sampleRate);
+      final right = Float32List(sampleRate);
+      for (var i = 0; i < sampleRate; i++) {
+        left[i] = 0.5 * math.sin(2 * math.pi * 440 * i / sampleRate);
+        right[i] = left[i];
+      }
+      // ~10ms of silence in the right channel only.
+      for (var i = 22000; i < 22441; i++) {
+        right[i] = 0;
+      }
+
+      final result = analyseSamples(
+        [left, right],
+        sampleRate: sampleRate,
+        config: const DetectorConfig(perChannel: true),
+      );
+
+      final dropouts =
+          result.defects.where((d) => d.type == DefectType.dropout).toList();
+      expect(dropouts, isNotEmpty);
+      expect(dropouts.every((d) => d.channel == 1), isTrue);
+    });
   });
 
   // -------------------------------------------------------------------------

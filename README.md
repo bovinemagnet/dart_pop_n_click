@@ -4,7 +4,7 @@ Pure Dart library to detect pops and clicks in WAV, AIFF and FLAC audio files.
 
 ## Features
 
-- Detect clicks (1–10 samples) and pops (10–150 samples) in WAV, AIFF and FLAC audio
+- Detect clicks (1–10 samples) and pops (11–150 samples) in WAV, AIFF and FLAC audio
 - Detects clipping (hard digital saturation), dropouts (brief digital silence), and DC offset
 - AIFF and AIFF-C format support (big-endian PCM, `sowt` little-endian variant)
 - FLAC support for native streams, decoded via the pure-Dart `dart_flac` package
@@ -98,7 +98,7 @@ Analyses a `Uint8List` of audio bytes and returns a `Future<AnalysisResult>`.
 | Type | Description |
 |---|---|
 | `DefectType.click` | Sharp transient spanning 1–10 samples — typically an impulse-like disturbance. |
-| `DefectType.pop` | Wider transient spanning 10–150 samples — audible as a dull "pop". |
+| `DefectType.pop` | Wider transient spanning 11–150 samples — audible as a dull "pop". |
 | `DefectType.clipping` | A run of consecutive samples pinned at ±1.0, indicating hard digital saturation. |
 | `DefectType.dropout` | A brief, unexpected region of digital silence within audio content (e.g. a buffer underrun or decoder glitch). |
 
@@ -174,6 +174,11 @@ Glob patterns support `*`, `**` (recursive), `?`, character classes `[abc]`, and
 |---|---|
 | `--sensitivity=low\|medium\|high` | Detection sensitivity (default: `medium`). |
 | `--min-confidence=0.0–1.0` | Suppress results below this score. |
+| `--max-defects=N` | Maximum number of defects to report (default: `0` = unlimited). |
+| `--per-channel` | Analyse each channel independently instead of summing to mono. |
+| `--no-clipping` | Disable clipping detection. |
+| `--no-dropouts` | Disable dropout detection. |
+| `--no-dc-offset` | Disable per-channel DC offset reporting. |
 | `--threshold=0.0–1.0` | Exit code 1 when defects above this score are found. |
 | `--output=text\|json` | Output format (default: `text`). |
 | `--quiet` | Suppress all output. |
@@ -235,7 +240,7 @@ $ audiodefect analyse recording.raw --raw --sample-rate=48000 --bit-depth=24 --c
 1. **High-pass differentiator**: `d[n] = x[n] - x[n-1]`. Accentuates transients.
 2. **Adaptive MAD threshold**: Median Absolute Deviation over a sliding ≈10 ms window provides a local noise estimate. The threshold is `MAD × 1.4826 × thresholdMultiplier`.
 3. **Region merging**: Adjacent flagged samples within a gap of 4 are merged into contiguous regions.
-4. **Classification**: Regions 1–10 samples wide → `click`; 10–150 samples → `pop`; wider → discarded.
+4. **Classification**: Regions 1–10 samples wide → `click`; 11–150 samples → `pop`; wider → discarded.
 5. **Confidence score**: Logistic function applied to peak-to-noise ratio, yielding a calibrated 0.0–1.0 score.
 
 ---

@@ -14,6 +14,12 @@ void main() {
   late Directory tmp;
   late String prev;
 
+  // This suite is the only one that mutates the process-wide
+  // `Directory.current` (other suites resolve paths independently of cwd —
+  // see test/package_root.dart — specifically so this doesn't race them).
+  // Absolute glob patterns are avoided because `package:glob` parses
+  // patterns with POSIX syntax; a Windows drive-letter root doesn't resolve
+  // through it, so relative patterns + chdir is required cross-platform.
   setUp(() async {
     tmp = await Directory.systemTemp.createTemp('audiodefect_glob_');
     prev = Directory.current.path;

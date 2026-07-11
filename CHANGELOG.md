@@ -1,3 +1,20 @@
+## 0.4.0 (2026-07-06)
+
+- WAVE_FORMAT_EXTENSIBLE (0xFFFE) WAV support — PCM and IEEE float resolved via the SubFormat GUID; oversized fmt extensions (cbSize > 22) are now skipped correctly
+- **Fix:** A-law decode polarity was inverted (whole waveform flipped) in AIFF-C `alaw` files
+- **Fix:** float WAV files with a sample size other than 32-bit are now rejected instead of silently mis-decoded
+- **Fix:** `minConfidence` and `maxDefects` now apply to clipping and dropout defects, not just clicks and pops
+- **Fix:** WAV bit depths other than 8/16/24/32 are rejected up front instead of crashing the PCM decoder
+- **Fix:** malformed glob patterns (e.g. an unmatched `[`) no longer crash the CLI; a literal file with that name is still found
+- **Fix:** the CLI `--format` override is now honoured instead of always auto-detecting
+- **Fix:** I/O errors in CLI `--raw` mode exit cleanly with code 3 instead of an unhandled exception
+- Windows glob patterns using `\` separators now match (converted for `package:glob`)
+- Dropout detection honours `DetectorConfig.perChannel` — each channel is scanned independently and defects carry their channel index, catching dropouts masked by the mono sum
+- New CLI options: `--per-channel`, `--max-defects`, `--no-clipping`, `--no-dropouts`, `--no-dc-offset`; verbose text output now includes per-channel DC offset
+- Adaptive MAD threshold evaluated on an interpolated grid — large-file analysis is dramatically faster with an effectively unchanged threshold
+- `analyseFile()` checks the file size before loading, so over-limit files fail fast without exhausting memory
+- Dependencies: `dart_flac` ^0.0.6, `lints` ^6.1.0
+
 ## 0.3.0 (2026-05-17)
 
 - FLAC support — native FLAC streams can now be analysed via `analyseFile()` / `analyseBytes()`, and decoded directly with the new `decodeFlac()` function returning `FlacData`

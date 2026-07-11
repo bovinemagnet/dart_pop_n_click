@@ -136,12 +136,15 @@ Uint8List buildWavRaw({
 /// The fmt chunk is 40 bytes: the 16 standard bytes plus a 22-byte extension
 /// (cbSize, wValidBitsPerSample, dwChannelMask, and the 16-byte SubFormat GUID).
 /// [subFormatCode] is the low word of the GUID (1 = PCM, 3 = IEEE float).
+/// [extraExtensionBytes] appends zero padding after the GUID (and grows
+/// cbSize to match) to model encoders that write a larger extension.
 Uint8List buildWavExtensible16Mono(
   List<int> samples, {
   int sampleRate = 44100,
   int subFormatCode = 1,
+  int extraExtensionBytes = 0,
 }) {
-  const fmtSize = 40;
+  final fmtSize = 40 + extraExtensionBytes;
   final dataSize = samples.length * 2;
   final riffSize = 4 + (8 + fmtSize) + (8 + dataSize);
   final buf = Uint8List(8 + riffSize);
@@ -176,7 +179,7 @@ Uint8List buildWavExtensible16Mono(
   writeU32(sampleRate * 2); // byte rate
   writeU16(2); // block align
   writeU16(16); // bits per sample (container)
-  writeU16(22); // cbSize
+  writeU16(22 + extraExtensionBytes); // cbSize
   writeU16(16); // wValidBitsPerSample
   writeU32(0x4); // dwChannelMask (SPEAKER_FRONT_CENTER)
   // SubFormat GUID: {subFormatCode-0000-0010-8000-00AA00389B71}
@@ -187,6 +190,7 @@ Uint8List buildWavExtensible16Mono(
   for (final b in [0x80, 0x00, 0x00, 0xAA, 0x00, 0x38, 0x9B, 0x71]) {
     buf[pos++] = b;
   }
+  pos += extraExtensionBytes; // zero padding beyond the GUID
 
   writeFourCC('data');
   writeU32(dataSize);
@@ -588,6 +592,18 @@ void main() {
       expect(data.metadata.channels, equals(1));
       expect(data.metadata.bitDepth, equals(16));
       expect(data.metadata.sampleRate, equals(44100));
+      expect(data.samples[0][1], closeTo(1.0, 1e-4));
+      expect(data.samples[0][2], closeTo(-1.0, 1e-4));
+    });
+
+    test('decodes an extensible file whose extension is larger than the GUID',
+        () {
+      // Some encoders write cbSize > 22; the decoder must skip the extra
+      // extension bytes to stay aligned with the following data chunk.
+      final wav = buildWavExtensible16Mono([0, 32767, -32768, 0],
+          extraExtensionBytes: 4);
+      final data = decodeWav(wav);
+      expect(data.metadata.channels, equals(1));
       expect(data.samples[0][1], closeTo(1.0, 1e-4));
       expect(data.samples[0][2], closeTo(-1.0, 1e-4));
     });

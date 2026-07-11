@@ -24,6 +24,8 @@ Future<void> main() async {
     }
   } on UnsupportedFormatException catch (e) {
     print('Format error: $e');
+  } on CorruptFileException catch (e) {
+    print('Corrupt file: $e');
   } on IoException catch (e) {
     print('I/O error: $e');
   }
