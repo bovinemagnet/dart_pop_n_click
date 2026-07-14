@@ -55,10 +55,14 @@ void main() async {
 
 | Module | Exports |
 |---|---|
-| `analyser.dart` | `analyseFile()`, `analyseBytes()`, `analysePcm()`, `analyseSamples()` |
+| `analyser.dart` | `analyseFile()`, `analyseBytes()`, `analysePcm()`, `analyseSamples()`, `AudioFileFormat` |
 | `models.dart` | `DetectorConfig`, `Sensitivity`, `Defect`, `DefectType`, `AudioMetadata`, `AnalysisResult`, `PcmFormat`, `UnsupportedFormatException`, `CorruptFileException`, `IoException` |
+| `wav_decoder.dart` | `decodeWav()`, `WavData` |
+| `aiff_decoder.dart` | `decodeAiff()`, `AiffData` |
+| `flac_decoder.dart` | `decodeFlac()`, `FlacData` |
 | `pcm_decoder.dart` | `decodePcmBytes()` |
 | `math_utils.dart` | `median()`, `mad()` |
+| `version.dart` | `packageVersion` |
 
 ### `analyseFile(path, {config})`
 Reads the file at `path` and returns a `Future<AnalysisResult>`.
@@ -172,6 +176,7 @@ Glob patterns support `*`, `**` (recursive), `?`, character classes `[abc]`, and
 #### Options
 | Flag | Description |
 |---|---|
+| `--format=wav\|aiff\|flac` | Override format auto-detection. |
 | `--sensitivity=low\|medium\|high` | Detection sensitivity (default: `medium`). |
 | `--min-confidence=0.0–1.0` | Suppress results below this score. |
 | `--max-defects=N` | Maximum number of defects to report (default: `0` = unlimited). |

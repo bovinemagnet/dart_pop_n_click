@@ -24,3 +24,4 @@ export 'src/math_utils.dart';
 export 'src/models.dart';
 export 'src/pcm_decoder.dart';
 export 'src/version.dart';
+export 'src/wav_decoder.dart';

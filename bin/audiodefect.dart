@@ -266,6 +266,9 @@ Future<void> _runAnalyse(ArgResults cmd) async {
       }
     }
 
+    // exit() does not drain the stdout buffer; flush so large (e.g. JSON)
+    // output is never truncated.
+    await stdout.flush();
     exit(aboveThreshold.isNotEmpty ? _exitDefectsFound : _exitClean);
   }
 
@@ -330,6 +333,9 @@ Future<void> _runAnalyse(ArgResults cmd) async {
         '\nSummary: ${filePaths.length} file(s), $totalDefects total defect(s).');
   }
 
+  // exit() does not drain the stdout buffer; flush so large (e.g. JSON)
+  // output is never truncated.
+  await stdout.flush();
   exit(worstExitCode);
 }
 

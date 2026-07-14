@@ -430,26 +430,30 @@ void main() {
     // PcmFormat invalid combinations
     // -------------------------------------------------------------------
     group('PcmFormat invalid combinations', () {
-      test('bitDepth 0 with non-empty bytes throws', () {
+      test('bitDepth 0 with non-empty bytes throws ArgumentError', () {
         final format = PcmFormat(sampleRate: 44100, bitDepth: 0, channels: 1);
         // bytesPerSample = 0 ~/ 8 = 0, bytesPerFrame = 0
-        // bytes.length % 0 would throw or decodePcmBytes should handle
         final bytes = Uint8List(4);
-        expect(() => decodePcmBytes(bytes, format), throwsA(anything));
+        expect(() => decodePcmBytes(bytes, format), throwsArgumentError);
       });
 
-      test('channels 0 with non-empty bytes throws', () {
+      test('channels 0 with non-empty bytes throws ArgumentError', () {
         final format = PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 0);
         // bytesPerFrame = 2 * 0 = 0
         final bytes = Uint8List(4);
-        expect(() => decodePcmBytes(bytes, format), throwsA(anything));
+        expect(() => decodePcmBytes(bytes, format), throwsArgumentError);
       });
 
-      test('bitDepth 7 (not multiple of 8) throws', () {
+      test('bitDepth 7 (not multiple of 8) throws ArgumentError', () {
         final format = PcmFormat(sampleRate: 44100, bitDepth: 7, channels: 1);
         // bytesPerSample = 7 ~/ 8 = 0, bytesPerFrame = 0
         final bytes = Uint8List(1);
-        expect(() => decodePcmBytes(bytes, format), throwsA(anything));
+        expect(() => decodePcmBytes(bytes, format), throwsArgumentError);
+      });
+
+      test('channels 0 with empty bytes throws ArgumentError', () {
+        final format = PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 0);
+        expect(() => decodePcmBytes(Uint8List(0), format), throwsArgumentError);
       });
 
       test('isFloat true with bitDepth 16 throws', () {

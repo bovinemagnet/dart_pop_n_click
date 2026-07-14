@@ -1,6 +1,10 @@
-## 0.4.0 (2026-07-06)
+## 0.4.0 (2026-07-14)
 
 - WAVE_FORMAT_EXTENSIBLE (0xFFFE) WAV support — PCM and IEEE float resolved via the SubFormat GUID; oversized fmt extensions (cbSize > 22) are now skipped correctly
+- `decodeWav()` and `WavData` are now exported from the public library entry point, matching `decodeAiff()` and `decodeFlac()`
+- **Fix:** `analyseSamples()` with an empty channel list returns a clean result instead of throwing `RangeError`
+- **Fix:** `decodePcmBytes()` rejects a `PcmFormat` with zero channels or a bit depth below 8 with a descriptive `ArgumentError` instead of a bare division-by-zero error
+- **Fix:** the CLI flushes stdout before exiting so large JSON output is not truncated
 - **Fix:** A-law decode polarity was inverted (whole waveform flipped) in AIFF-C `alaw` files
 - **Fix:** float WAV files with a sample size other than 32-bit are now rejected instead of silently mis-decoded
 - **Fix:** `minConfidence` and `maxDefects` now apply to clipping and dropout defects, not just clicks and pops

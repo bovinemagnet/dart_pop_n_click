@@ -7,9 +7,17 @@ import 'models.dart';
 /// Decode raw interleaved PCM [bytes] into normalised Float32 samples per channel.
 ///
 /// Returns one [Float32List] per channel, values in \[-1.0, 1.0\].
+/// Throws [ArgumentError] if [format] describes a non-positive frame size
+/// (zero channels, or a bit depth below 8).
 /// Throws [CorruptFileException] if byte length is not aligned to frame size.
 List<Float32List> decodePcmBytes(Uint8List bytes, PcmFormat format) {
   final frameSize = format.bytesPerFrame;
+  if (frameSize <= 0) {
+    throw ArgumentError(
+      'Invalid PcmFormat: ${format.channels} channel(s) at '
+      '${format.bitDepth}-bit gives a non-positive frame size.',
+    );
+  }
   if (bytes.isEmpty) {
     return List.generate(format.channels, (_) => Float32List(0));
   }

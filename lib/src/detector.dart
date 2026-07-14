@@ -52,6 +52,8 @@ List<Defect> detectDefects(
   int sampleRate,
   DetectorConfig config,
 ) {
+  if (channelSamples.isEmpty) return const [];
+
   final List<Defect> allDefects = [];
 
   final channelsToProcess = config.perChannel ? channelSamples.length : 1;

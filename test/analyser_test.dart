@@ -549,6 +549,14 @@ void main() {
       expect(result.defects, isEmpty);
       expect(result.aggregateConfidence, equals(0.0));
     });
+
+    test('zero channels throws ArgumentError', () {
+      final format = PcmFormat(sampleRate: 44100, bitDepth: 16, channels: 0);
+      expect(
+        () => analysePcm(Uint8List(4), format: format),
+        throwsArgumentError,
+      );
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -556,6 +564,14 @@ void main() {
   // -------------------------------------------------------------------------
 
   group('analyseSamples() – edge cases', () {
+    test('empty channel list returns a clean result', () async {
+      final result = analyseSamples(<Float32List>[], sampleRate: 44100);
+      expect(result.defects, isEmpty);
+      expect(result.aggregateConfidence, equals(0.0));
+      expect(result.metadata.channels, equals(0));
+      expect(result.metadata.duration, equals(Duration.zero));
+    });
+
     test('single-sample channels returns no defects', () async {
       final samples = [
         Float32List.fromList([0.5])
