@@ -532,14 +532,70 @@ void printDeltaAgainstPrevious(Map<String, dynamic> run, String currentDir) {
       '(${prev['defect_count']} → ${cur['defect_count']}).');
 }
 
-/// Implemented in the merge/compare task.
+/// Merges a labels file exported from report.html into the accumulated
+/// ground truth at tool/harness_results/labels.json.
 void runMergeLabels(List<String> rest) {
-  stderr.writeln('merge-labels: not yet implemented');
-  exitCode = 70;
+  if (rest.length != 1) {
+    stderr.writeln('Usage: dart run tool/real_music_harness.dart '
+        'merge-labels <exported-labels.json>');
+    exitCode = 64;
+    return;
+  }
+  final incomingFile = File(rest.single);
+  if (!incomingFile.existsSync()) {
+    stderr.writeln('File not found: ${rest.single}');
+    exitCode = 66;
+    return;
+  }
+  final incoming = [
+    for (final e in jsonDecode(incomingFile.readAsStringSync()) as List)
+      LabelEntry.fromJson(e as Map<String, dynamic>)
+  ];
+  final merged = mergeLabels(loadLabels(), incoming);
+  final out = File('$resultsDir/labels.json')..createSync(recursive: true);
+  out.writeAsStringSync(const JsonEncoder.withIndent('  ')
+      .convert([for (final l in merged) l.toJson()]));
+  stdout.writeln('Merged ${incoming.length} labels; '
+      '${merged.length} total in $resultsDir/labels.json');
 }
 
-/// Implemented in the merge/compare task.
+/// Prints per-file and total defect-count deltas between two run
+/// directories (each containing a run.json).
 void runCompare(List<String> rest) {
-  stderr.writeln('compare: not yet implemented');
-  exitCode = 70;
+  if (rest.length != 2) {
+    stderr.writeln('Usage: dart run tool/real_music_harness.dart '
+        'compare <runA-dir> <runB-dir>');
+    exitCode = 64;
+    return;
+  }
+  final runs = <Map<String, dynamic>>[];
+  for (final dir in rest) {
+    final f = File('$dir/run.json');
+    if (!f.existsSync()) {
+      stderr.writeln('No run.json in $dir');
+      exitCode = 66;
+      return;
+    }
+    runs.add(jsonDecode(f.readAsStringSync()) as Map<String, dynamic>);
+  }
+  final a = runs[0], b = runs[1];
+  stdout.writeln('Comparing ${a['timestamp']} → ${b['timestamp']}');
+  if (jsonEncode(a['config']) != jsonEncode(b['config'])) {
+    stdout.writeln('NOTE: configs differ: ${a['config']} vs ${b['config']}');
+  }
+  final byPathA = {
+    for (final f in (a['files'] as List).cast<Map<String, dynamic>>())
+      f['path'] as String: f
+  };
+  for (final fb in (b['files'] as List).cast<Map<String, dynamic>>()) {
+    final fa = byPathA[fb['path']];
+    if (fa == null) continue;
+    final delta = (fb['defect_count'] as int) - (fa['defect_count'] as int);
+    stdout.writeln('${'${delta >= 0 ? '+' : ''}$delta'.padLeft(7)}  '
+        '${(fb['path'] as String).split('/').last}');
+  }
+  final ta = a['totals'] as Map<String, dynamic>;
+  final tb = b['totals'] as Map<String, dynamic>;
+  stdout
+      .writeln("Totals: ${ta['defect_count']} → ${tb['defect_count']} defects");
 }
