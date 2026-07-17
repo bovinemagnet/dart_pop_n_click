@@ -190,4 +190,101 @@ void main() {
       expect(slice[0].length, 9000); // 47000-8000..48000
     });
   });
+
+  group('summariseFile', () {
+    AnalysisResult result() => AnalysisResult(
+          defects: [
+            defect(ms: 100, confidence: 0.95, type: DefectType.click),
+            defect(ms: 200, confidence: 0.55, type: DefectType.click),
+            defect(ms: 300, confidence: 0.35, type: DefectType.pop),
+          ],
+          aggregateConfidence: 1.0,
+          metadata: const AudioMetadata(
+            sampleRate: 44100,
+            bitDepth: 16,
+            channels: 2,
+            duration: Duration(seconds: 10),
+          ),
+        );
+
+    test('reports counts, rate, and type breakdown', () {
+      final summary = summariseFile(
+        path: '/music/a.flac',
+        result: result(),
+        verdicts: [null, null, null],
+      );
+      expect(summary['path'], '/music/a.flac');
+      expect(summary['defect_count'], 3);
+      expect(summary['defects_per_second'], closeTo(0.3, 1e-9));
+      expect(summary['by_type'], {'click': 2, 'pop': 1});
+      expect(summary['labelled'], {'real': 0, 'false': 0});
+    });
+
+    test('counts labelled verdicts', () {
+      final summary = summariseFile(
+        path: '/music/a.flac',
+        result: result(),
+        verdicts: ['real', 'false', 'false'],
+      );
+      expect(summary['labelled'], {'real': 1, 'false': 2});
+    });
+  });
+
+  group('summariseTotals', () {
+    test('aggregates counts and computes precision', () {
+      final totals = summariseTotals([
+        {
+          'defect_count': 10,
+          'duration_ms': 10000,
+          'labelled': {'real': 2, 'false': 6},
+        },
+        {
+          'defect_count': 20,
+          'duration_ms': 10000,
+          'labelled': {'real': 2, 'false': 0},
+        },
+      ]);
+      expect(totals['file_count'], 2);
+      expect(totals['defect_count'], 30);
+      expect(totals['defects_per_second'], closeTo(1.5, 1e-9));
+      expect(totals['labelled_count'], 10);
+      expect(totals['precision'], closeTo(0.4, 1e-9));
+    });
+
+    test('precision is null when nothing is labelled', () {
+      final totals = summariseTotals([
+        {
+          'defect_count': 5,
+          'duration_ms': 1000,
+          'labelled': {'real': 0, 'false': 0},
+        },
+      ]);
+      expect(totals['precision'], isNull);
+    });
+  });
+
+  group('buildReportHtml', () {
+    final html = buildReportHtml([
+      {
+        'snippet': 'snippets/a_100ms_click_c95_ch0_s4410.wav',
+        'file': '/music/a.flac',
+        'channel': 0,
+        'sample_index': 4410,
+        'type': 'click',
+        'confidence': 0.95,
+        'offset_ms': 100,
+      },
+    ]);
+
+    test('embeds the snippet entries as JSON', () {
+      expect(html, contains('snippets/a_100ms_click_c95_ch0_s4410.wav'));
+      expect(html, contains('"sample_index": 4410'));
+    });
+
+    test('renders an audio player and export button', () {
+      expect(html, contains('<audio'));
+      expect(html, contains('Export labels'));
+      expect(html, contains('merge-labels'));
+    });
+  });
 }
