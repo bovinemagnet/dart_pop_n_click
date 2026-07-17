@@ -153,8 +153,9 @@ String snippetName(String audioPath, Defect d) =>
     '_c${(d.confidence * 100).round()}_ch${d.channel}_s${d.sampleIndex}.wav';
 
 /// Slices ±[halfWindowSeconds] of audio around [sampleIndex] from every
-/// channel, clamped to the sample bounds.
-List<List<double>> extractSnippet(
+/// channel, clamped to the sample bounds. Returns the per-channel slices
+/// and the slice's first sample index within the source audio.
+({List<List<double>> channels, int startSample}) extractSnippet(
   List<Float32List> channels,
   int sampleIndex,
   int sampleRate, {
@@ -166,7 +167,10 @@ List<List<double>> extractSnippet(
   var end = sampleIndex + half;
   if (start < 0) start = 0;
   if (end > len) end = len;
-  return [for (final ch in channels) ch.sublist(start, end)];
+  return (
+    channels: [for (final ch in channels) ch.sublist(start, end)],
+    startSample: start,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -450,7 +454,7 @@ Future<void> runScan(ArgResults args) async {
       final slice =
           extractSnippet(flac.samples, d.sampleIndex, flac.metadata.sampleRate);
       File('${snippetsDir.path}/$name').writeAsBytesSync(buildWav(
-        channels: slice,
+        channels: slice.channels,
         bitsPerSample: 16,
         sampleRate: flac.metadata.sampleRate,
       ));

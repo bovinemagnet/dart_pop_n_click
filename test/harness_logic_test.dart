@@ -174,20 +174,23 @@ void main() {
     test('extracts a window of 2 × halfWindowSeconds around the index', () {
       final channels = [Float32List(48000), Float32List(48000)];
       final slice = extractSnippet(channels, 24000, 8000);
-      expect(slice, hasLength(2));
-      expect(slice[0].length, 16000); // ±1s at 8000 Hz
+      expect(slice.channels, hasLength(2));
+      expect(slice.channels[0].length, 16000); // ±1s at 8000 Hz
+      expect(slice.startSample, 16000); // 24000 − 8000
     });
 
     test('clamps at the start of the audio', () {
       final channels = [Float32List(48000)];
       final slice = extractSnippet(channels, 1000, 8000);
-      expect(slice[0].length, 9000); // 0..1000+8000
+      expect(slice.channels[0].length, 9000); // 0..1000+8000
+      expect(slice.startSample, 0);
     });
 
     test('clamps at the end of the audio', () {
       final channels = [Float32List(48000)];
       final slice = extractSnippet(channels, 47000, 8000);
-      expect(slice[0].length, 9000); // 47000-8000..48000
+      expect(slice.channels[0].length, 9000); // 47000-8000..48000
+      expect(slice.startSample, 39000);
     });
   });
 
