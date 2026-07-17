@@ -270,6 +270,7 @@ void main() {
     final html = buildReportHtml([
       {
         'snippet': 'snippets/a_100ms_click_c95_ch0_s4410.wav',
+        'waveform': 'snippets/a_100ms_click_c95_ch0_s4410.svg',
         'file': '/music/a.flac',
         'channel': 0,
         'sample_index': 4410,
@@ -288,6 +289,13 @@ void main() {
       expect(html, contains('<audio'));
       expect(html, contains('Export labels'));
       expect(html, contains('merge-labels'));
+    });
+
+    test('renders a waveform column linking the snippet SVG', () {
+      expect(html, contains('<th>Waveform</th>'));
+      expect(html, contains('<img src='));
+      expect(html,
+          contains('"waveform": "snippets/a_100ms_click_c95_ch0_s4410.svg"'));
     });
   });
 }
