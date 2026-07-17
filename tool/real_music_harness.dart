@@ -15,9 +15,13 @@
 library;
 
 import 'dart:convert';
+import 'dart:io';
 import 'dart:typed_data';
 
+import 'package:args/args.dart';
 import 'package:audio_defect_detector/audio_defect_detector.dart';
+
+import 'wav_writer.dart';
 
 // ---------------------------------------------------------------------------
 // Labels
@@ -295,4 +299,247 @@ document.getElementById('export').addEventListener('click', () => {
 </body>
 </html>
 ''';
+}
+
+// ---------------------------------------------------------------------------
+// CLI
+// ---------------------------------------------------------------------------
+
+/// Root of all harness output (git-ignored).
+const String resultsDir = 'tool/harness_results';
+
+Future<void> main(List<String> argv) async {
+  final parser = ArgParser()
+    ..addCommand(
+      'scan',
+      ArgParser()
+        ..addOption('music-dir',
+            help: 'Root directory of the FLAC corpus.',
+            defaultsTo: '/Volumes/mac_volume_1/music')
+        ..addOption('sensitivity',
+            allowed: ['low', 'medium', 'high'], defaultsTo: 'medium')
+        ..addOption('min-confidence',
+            help: 'Suppress detections below this confidence.',
+            defaultsTo: '0.0')
+        ..addOption('limit',
+            help: 'Only scan the first N files (0 = all).', defaultsTo: '0')
+        ..addOption('max-snippets',
+            help: 'Snippet WAVs per file, top-N by confidence.',
+            defaultsTo: '10'),
+    )
+    ..addCommand('merge-labels', ArgParser())
+    ..addCommand('compare', ArgParser());
+
+  final ArgResults args;
+  try {
+    args = parser.parse(argv);
+  } on FormatException catch (e) {
+    stderr.writeln(e.message);
+    exitCode = 64;
+    return;
+  }
+
+  switch (args.command?.name) {
+    case 'scan':
+      await runScan(args.command!);
+    case 'merge-labels':
+      runMergeLabels(args.command!.rest);
+    case 'compare':
+      runCompare(args.command!.rest);
+    default:
+      stderr.writeln('Usage: dart run tool/real_music_harness.dart '
+          '<scan|merge-labels|compare> [options]');
+      exitCode = 64;
+  }
+}
+
+/// Loads the accumulated ground-truth labels (empty when none exist yet).
+List<LabelEntry> loadLabels() {
+  final f = File('$resultsDir/labels.json');
+  if (!f.existsSync()) return [];
+  final decoded = jsonDecode(f.readAsStringSync()) as List<dynamic>;
+  return [
+    for (final e in decoded) LabelEntry.fromJson(e as Map<String, dynamic>)
+  ];
+}
+
+/// Scans the corpus: analyse every FLAC, write run.json, snippets, and the
+/// labelling report, then print a summary and delta against the previous
+/// run with the same config.
+Future<void> runScan(ArgResults args) async {
+  final musicDir = args['music-dir'] as String;
+  final sensitivity = Sensitivity.values.byName(args['sensitivity'] as String);
+  final minConfidence = double.parse(args['min-confidence'] as String);
+  final limit = int.parse(args['limit'] as String);
+  final maxSnippets = int.parse(args['max-snippets'] as String);
+
+  final dir = Directory(musicDir);
+  if (!dir.existsSync()) {
+    stderr.writeln('Music directory not found: $musicDir (volume mounted?)');
+    exitCode = 66;
+    return;
+  }
+
+  var files = dir
+      .listSync(recursive: true)
+      .whereType<File>()
+      .where((f) => f.path.toLowerCase().endsWith('.flac'))
+      .map((f) => f.path)
+      .toList()
+    ..sort();
+  if (limit > 0 && files.length > limit) files = files.sublist(0, limit);
+  if (files.isEmpty) {
+    stderr.writeln('No FLAC files found under $musicDir');
+    exitCode = 66;
+    return;
+  }
+
+  final config = DetectorConfig(
+    sensitivity: sensitivity,
+    minConfidence: minConfidence,
+  );
+  final configJson = {
+    'sensitivity': sensitivity.name,
+    'min_confidence': minConfidence,
+  };
+
+  final labels = loadLabels();
+
+  final stamp =
+      DateTime.now().toIso8601String().replaceAll(':', '').split('.').first;
+  final runDir = Directory('$resultsDir/runs/$stamp');
+  final snippetsDir = Directory('${runDir.path}/snippets')
+    ..createSync(recursive: true);
+
+  final fileSummaries = <Map<String, dynamic>>[];
+  final snippetEntries = <Map<String, dynamic>>[];
+
+  for (var i = 0; i < files.length; i++) {
+    final path = files[i];
+    stdout.write('${i + 1}/${files.length}  ${path.split('/').last} … ');
+
+    final FlacData flac;
+    try {
+      flac = decodeFlac(File(path).readAsBytesSync());
+    } catch (e) {
+      stdout.writeln('SKIP ($e)');
+      continue;
+    }
+
+    final result = analyseSamples(
+      flac.samples,
+      sampleRate: flac.metadata.sampleRate,
+      bitDepth: flac.metadata.bitDepth,
+      config: config,
+    );
+
+    final verdicts = [
+      for (final d in result.defects)
+        matchVerdict(labels,
+            file: path,
+            channel: d.channel,
+            sampleIndex: d.sampleIndex,
+            sampleRate: flac.metadata.sampleRate),
+    ];
+    fileSummaries
+        .add(summariseFile(path: path, result: result, verdicts: verdicts));
+
+    for (final d in topDefects(result.defects, maxSnippets)) {
+      final name = snippetName(path, d);
+      final slice =
+          extractSnippet(flac.samples, d.sampleIndex, flac.metadata.sampleRate);
+      File('${snippetsDir.path}/$name').writeAsBytesSync(buildWav(
+        channels: slice,
+        bitsPerSample: 16,
+        sampleRate: flac.metadata.sampleRate,
+      ));
+      snippetEntries.add({
+        'snippet': 'snippets/$name',
+        'file': path,
+        'channel': d.channel,
+        'sample_index': d.sampleIndex,
+        'type': d.type.name,
+        'confidence': d.confidence,
+        'offset_ms': d.offset.inMilliseconds,
+      });
+    }
+    stdout.writeln('${result.defects.length} defects');
+  }
+
+  final run = {
+    'schema_version': '1',
+    'timestamp': stamp,
+    'config': configJson,
+    'files': fileSummaries,
+    'totals': summariseTotals(fileSummaries),
+  };
+  File('${runDir.path}/run.json')
+      .writeAsStringSync(const JsonEncoder.withIndent('  ').convert(run));
+  File('${runDir.path}/report.html')
+      .writeAsStringSync(buildReportHtml(snippetEntries));
+
+  printSummary(run);
+  printDeltaAgainstPrevious(run, runDir.path);
+  stdout.writeln('\nRun written to ${runDir.path}');
+  stdout.writeln('Open ${runDir.path}/report.html to label snippets.');
+}
+
+/// Prints the per-file table and totals for a completed run.
+void printSummary(Map<String, dynamic> run) {
+  final files = (run['files'] as List).cast<Map<String, dynamic>>();
+  stdout.writeln('\n${'Defects'.padLeft(8)}  ${'Rate/s'.padLeft(7)}  Track');
+  for (final f in files) {
+    final rate = (f['defects_per_second'] as num).toStringAsFixed(2);
+    stdout.writeln('${f['defect_count'].toString().padLeft(8)}  '
+        '${rate.padLeft(7)}  ${(f['path'] as String).split('/').last}');
+  }
+  final t = run['totals'] as Map<String, dynamic>;
+  stdout.writeln('Totals: ${t['defect_count']} defects across '
+      '${t['file_count']} files '
+      '(${(t['defects_per_second'] as num).toStringAsFixed(2)}/s).');
+  final p = t['precision'];
+  if (p != null) {
+    stdout.writeln('Precision over ${t['labelled_count']} labelled '
+        'detections: ${((p as num) * 100).toStringAsFixed(1)}%');
+  } else {
+    stdout.writeln('No labelled detections yet — open report.html to label.');
+  }
+}
+
+/// Prints the total-defect delta against the most recent earlier run that
+/// used the same detector config. Silent when no comparable run exists.
+void printDeltaAgainstPrevious(Map<String, dynamic> run, String currentDir) {
+  final runsRoot = Directory('$resultsDir/runs');
+  if (!runsRoot.existsSync()) return;
+  final dirs = runsRoot.listSync().whereType<Directory>().toList()
+    ..sort((a, b) => a.path.compareTo(b.path));
+  Map<String, dynamic>? previous;
+  for (final d in dirs) {
+    if (d.path == currentDir) continue;
+    final f = File('${d.path}/run.json');
+    if (!f.existsSync()) continue;
+    final candidate = jsonDecode(f.readAsStringSync()) as Map<String, dynamic>;
+    if (jsonEncode(candidate['config']) == jsonEncode(run['config'])) {
+      previous = candidate; // dirs sorted ascending → last match wins
+    }
+  }
+  if (previous == null) return;
+  final cur = run['totals'] as Map<String, dynamic>;
+  final prev = previous['totals'] as Map<String, dynamic>;
+  final delta = (cur['defect_count'] as int) - (prev['defect_count'] as int);
+  stdout.writeln('Delta vs run ${previous['timestamp']} (same config): '
+      '${delta >= 0 ? '+' : ''}$delta defects '
+      '(${prev['defect_count']} → ${cur['defect_count']}).');
+}
+
+/// Implemented in the merge/compare task.
+void runMergeLabels(List<String> rest) {
+  stderr.writeln('merge-labels: not yet implemented');
+  exitCode = 70;
+}
+
+/// Implemented in the merge/compare task.
+void runCompare(List<String> rest) {
+  stderr.writeln('compare: not yet implemented');
+  exitCode = 70;
 }
