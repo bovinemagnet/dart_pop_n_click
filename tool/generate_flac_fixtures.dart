@@ -38,7 +38,10 @@ void main() {
 
   _writeFixture(
     'sine_clean_16_stereo.flac',
-    buildWav(channels: [_sine(), _sine()], bitsPerSample: 16, sampleRate: sampleRate),
+    buildWav(
+        channels: [_sine(), _sine()],
+        bitsPerSample: 16,
+        sampleRate: sampleRate),
   );
   _writeFixture(
     'sine_click_16_stereo.flac',
@@ -54,7 +57,10 @@ void main() {
   );
   _writeFixture(
     'sine_24_stereo.flac',
-    buildWav(channels: [_sine(), _sine()], bitsPerSample: 24, sampleRate: sampleRate),
+    buildWav(
+        channels: [_sine(), _sine()],
+        bitsPerSample: 24,
+        sampleRate: sampleRate),
   );
 
   stdout.writeln('All fixtures generated.');
