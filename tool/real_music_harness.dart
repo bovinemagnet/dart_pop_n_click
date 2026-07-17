@@ -401,6 +401,7 @@ Future<void> runScan(ArgResults args) async {
   final configJson = {
     'sensitivity': sensitivity.name,
     'min_confidence': minConfidence,
+    'limit': limit,
   };
 
   final labels = loadLabels();
