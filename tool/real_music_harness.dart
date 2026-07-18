@@ -22,6 +22,7 @@ import 'package:args/args.dart';
 import 'package:audio_defect_detector/audio_defect_detector.dart';
 
 import 'wav_writer.dart';
+import 'waveform_svg.dart';
 
 // ---------------------------------------------------------------------------
 // Labels
@@ -153,8 +154,9 @@ String snippetName(String audioPath, Defect d) =>
     '_c${(d.confidence * 100).round()}_ch${d.channel}_s${d.sampleIndex}.wav';
 
 /// Slices ±[halfWindowSeconds] of audio around [sampleIndex] from every
-/// channel, clamped to the sample bounds.
-List<List<double>> extractSnippet(
+/// channel, clamped to the sample bounds. Returns the per-channel slices
+/// and the slice's first sample index within the source audio.
+({List<List<double>> channels, int startSample}) extractSnippet(
   List<Float32List> channels,
   int sampleIndex,
   int sampleRate, {
@@ -166,7 +168,10 @@ List<List<double>> extractSnippet(
   var end = sampleIndex + half;
   if (start < 0) start = 0;
   if (end > len) end = len;
-  return [for (final ch in channels) ch.sublist(start, end)];
+  return (
+    channels: [for (final ch in channels) ch.sublist(start, end)],
+    startSample: start,
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -253,8 +258,8 @@ defect) or <strong>False</strong> (musical content misdetected). Then use
 <em>Export labels</em> and merge the download with:
 <code>dart run tool/real_music_harness.dart merge-labels &lt;download&gt;</code></p>
 <table id="rows">
-  <tr><th>Snippet</th><th>Track</th><th>Type</th><th>Conf</th>
-      <th>Offset</th><th>Ch</th><th>Verdict</th></tr>
+  <tr><th>Waveform</th><th>Snippet</th><th>Track</th><th>Type</th>
+      <th>Conf</th><th>Offset</th><th>Ch</th><th>Verdict</th></tr>
 </table>
 <button id="export">Export labels</button>
 <script>
@@ -264,6 +269,8 @@ const table = document.getElementById('rows');
 entries.forEach((e, i) => {
   const tr = document.createElement('tr');
   tr.innerHTML =
+    '<td><a href="' + e.waveform + '"><img src="' + e.waveform +
+    '" width="400"></a></td>' +
     '<td><audio controls preload="none" src="' + e.snippet + '"></audio></td>' +
     '<td>' + e.file.split('/').pop() + '</td>' +
     '<td>' + e.type + '</td>' +
@@ -450,12 +457,19 @@ Future<void> runScan(ArgResults args) async {
       final slice =
           extractSnippet(flac.samples, d.sampleIndex, flac.metadata.sampleRate);
       File('${snippetsDir.path}/$name').writeAsBytesSync(buildWav(
-        channels: slice,
+        channels: slice.channels,
         bitsPerSample: 16,
         sampleRate: flac.metadata.sampleRate,
       ));
+      final svgName = name.replaceAll(RegExp(r'\.wav$'), '.svg');
+      File('${snippetsDir.path}/$svgName').writeAsStringSync(waveformSvg(
+        samples: slice.channels[d.channel],
+        sampleRate: flac.metadata.sampleRate,
+        defectIndex: d.sampleIndex - slice.startSample,
+      ));
       snippetEntries.add({
         'snippet': 'snippets/$name',
+        'waveform': 'snippets/$svgName',
         'file': path,
         'channel': d.channel,
         'sample_index': d.sampleIndex,
