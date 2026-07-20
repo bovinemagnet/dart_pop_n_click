@@ -20,12 +20,12 @@ double mad(Float32List values) {
   final n = values.length;
   if (n == 0) return 0.0;
   final work = Float32List.fromList(values);
-  final med = _medianViaSelect(work, n);
+  final med = medianViaSelect(work, n);
   final deviations = Float32List(n);
   for (int i = 0; i < n; i++) {
     deviations[i] = (values[i] - med).abs();
   }
-  return _medianViaSelect(deviations, n);
+  return medianViaSelect(deviations, n);
 }
 
 /// Swap two elements of [b].
@@ -40,7 +40,9 @@ void _swap(Float32List b, int i, int j) {
 /// less than or equal to `buf[k]` and every element right of it greater than or
 /// equal. Returns `buf[k]`. Uses a median-of-three pivot and iterates rather
 /// than recursing so degenerate inputs cannot exhaust the stack.
-double _selectKth(Float32List buf, int lo, int hi, int k) {
+///
+/// Package-internal: not exported from the public library.
+double selectKth(Float32List buf, int lo, int hi, int k) {
   while (true) {
     if (lo == hi) return buf[lo];
     final mid = lo + ((hi - lo) >> 1);
@@ -70,10 +72,12 @@ double _selectKth(Float32List buf, int lo, int hi, int k) {
 /// Median of the first [n] elements of [buf], reproducing the exact semantics
 /// of [median] on a sorted list — including averaging the two middle values
 /// for even [n]. Reorders [buf] in place (callers pass a throwaway buffer).
-double _medianViaSelect(Float32List buf, int n) {
+///
+/// Package-internal: not exported from the public library.
+double medianViaSelect(Float32List buf, int n) {
   if (n == 0) return 0.0;
   final k = n ~/ 2;
-  final hi = _selectKth(buf, 0, n - 1, k);
+  final hi = selectKth(buf, 0, n - 1, k);
   if (n.isOdd) return hi.toDouble();
   // For even n the lower-middle value is the maximum of the left partition
   // [0, k-1], which quickselect guarantees are all <= buf[k].
