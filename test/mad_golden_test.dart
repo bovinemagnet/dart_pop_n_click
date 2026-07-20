@@ -7,6 +7,8 @@ import 'package:audio_defect_detector/src/detector.dart';
 import 'package:audio_defect_detector/src/models.dart';
 import 'package:test/test.dart';
 
+import 'package_root.dart';
+
 /// One deterministic synthetic detection scenario.
 class GoldenCase {
   final String name;
@@ -84,8 +86,10 @@ String encodeGolden() {
 }
 
 void main() {
-  test('detector output matches committed golden', () {
-    final goldenFile = File('test/fixtures/mad_golden.json');
+  test('detector output matches committed golden', () async {
+    final root = await packageRootUri();
+    final goldenFile =
+        File(root.resolve('test/fixtures/mad_golden.json').toFilePath());
     final current = encodeGolden();
     final recording = Platform.environment['RECORD_GOLDEN'] == '1';
     if (recording || !goldenFile.existsSync()) {

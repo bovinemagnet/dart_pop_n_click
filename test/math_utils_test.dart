@@ -141,5 +141,19 @@ void main() {
         expect(mad(buf), equals(referenceMad(buf)), reason: '$c');
       }
     });
+
+    test('duplicate-heavy inputs identical to reference', () {
+      final rng = math.Random(99);
+      for (int trial = 0; trial < 200; trial++) {
+        final n = 20 + rng.nextInt(80); // 20..99 elements
+        final distinct = 1 + rng.nextInt(5); // few distinct values -> many ties
+        final buf = Float32List(n);
+        for (int i = 0; i < n; i++) {
+          buf[i] = rng.nextInt(distinct).toDouble();
+        }
+        expect(mad(buf), equals(referenceMad(buf)),
+            reason: 'n=$n distinct=$distinct trial=$trial');
+      }
+    });
   });
 }
