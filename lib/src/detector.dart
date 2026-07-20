@@ -219,7 +219,9 @@ Float32List _buildAdaptiveThreshold(
     for (int k = 0; k < len; k++) {
       devBuf[k] = (windowBuf[k] - med).abs();
     }
+    // MAD → sigma: multiply by consistency factor for normal distribution.
     final t = medianViaSelect(devBuf, len) * _kMadScaleFactor * multiplier;
+    // Enforce a minimum floor to avoid spurious detections in digital silence.
     return t < _kThresholdFloor ? _kThresholdFloor : t;
   }
 
