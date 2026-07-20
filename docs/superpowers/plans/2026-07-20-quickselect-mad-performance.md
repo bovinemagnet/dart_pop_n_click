@@ -153,7 +153,7 @@ Expected: PASS (the just-recorded golden matches current output).
 
 - [ ] **Step 4: Sanity-check the golden content**
 
-Run: `dart run tool/../bin/audiodefect.dart --help >/dev/null 2>&1; cat test/fixtures/mad_golden.json | head -20`
+Run: `head -30 test/fixtures/mad_golden.json`
 Expected: JSON array of 4 cases; `noise_clicks_44100` and `sine_pops_96000` have non-empty `defects`, `silence_44100` has an empty `defects` list. (If `noise_clicks_44100` is empty, the synthetic thresholds are wrong — stop and revisit before proceeding.)
 
 - [ ] **Step 5: Commit**
@@ -170,13 +170,48 @@ git commit -m "Add characterisation golden for detector MAD path"
 Measures the current path (baseline) so every later change is measured, not assumed. Carries its own frozen sort-based reference so it can always assert agreement.
 
 **Files:**
+- Create: `test/reference_mad.dart`
 - Create: `tool/bench_mad.dart`
 
 **Interfaces:**
 - Consumes: public `mad`, `analyseFile`, `DetectorConfig`, `Sensitivity` from `package:audio_defect_detector/audio_defect_detector.dart`; `detectDefects` from `src/detector.dart`.
-- Produces: `referenceMad(Float32List) -> double` (the frozen sort-based oracle, reused mentally by reviewers as the "before" implementation). CLI: `dart run tool/bench_mad.dart [--music <dir>]`.
+- Produces: `referenceMad(Float32List) -> double` and `referenceMedian(Float32List) -> double` in `test/reference_mad.dart` — the frozen sort-based oracle shared (imported, not duplicated) by the benchmark tool (Task 2) and the equivalence test (Task 3). CLI: `dart run tool/bench_mad.dart [--music <dir>]`.
 
-- [ ] **Step 1: Write the benchmark tool**
+- [ ] **Step 1: Create the shared frozen reference**
+
+Create `test/reference_mad.dart` (pure — depends only on `dart:typed_data`, so both a test and a tool can import it):
+
+```dart
+import 'dart:typed_data';
+
+/// Frozen sort-based Median Absolute Deviation — the implementation of `mad`
+/// before the quickselect rewrite. Kept as an independent oracle that shares no
+/// code with the production path: the quickselect `mad` must stay bit-for-bit
+/// identical to this. Imported by the unit equivalence test (Task 3) and the
+/// benchmark tool (Task 2).
+double referenceMad(Float32List values) {
+  if (values.isEmpty) return 0.0;
+  final sorted = Float32List.fromList(values)..sort();
+  final med = referenceMedian(sorted);
+  final dev = Float32List(sorted.length);
+  for (int i = 0; i < sorted.length; i++) {
+    dev[i] = (sorted[i] - med).abs();
+  }
+  dev.sort();
+  return referenceMedian(dev);
+}
+
+/// Median of a **sorted** list, matching the production `median` semantics
+/// (average of the two middle values for even length).
+double referenceMedian(Float32List sorted) {
+  final n = sorted.length;
+  if (n == 0) return 0.0;
+  if (n.isOdd) return sorted[n ~/ 2].toDouble();
+  return (sorted[n ~/ 2 - 1] + sorted[n ~/ 2]) / 2.0;
+}
+```
+
+- [ ] **Step 2: Write the benchmark tool**
 
 Create `tool/bench_mad.dart`:
 
@@ -202,25 +237,7 @@ import 'dart:typed_data';
 import 'package:audio_defect_detector/audio_defect_detector.dart';
 import 'package:audio_defect_detector/src/detector.dart';
 
-/// Frozen sort-based reference — the implementation before this work.
-double referenceMad(Float32List values) {
-  if (values.isEmpty) return 0.0;
-  final sorted = Float32List.fromList(values)..sort();
-  final med = _refMedian(sorted);
-  final dev = Float32List(sorted.length);
-  for (int i = 0; i < sorted.length; i++) {
-    dev[i] = (sorted[i] - med).abs();
-  }
-  dev.sort();
-  return _refMedian(dev);
-}
-
-double _refMedian(Float32List sorted) {
-  final n = sorted.length;
-  if (n == 0) return 0.0;
-  if (n.isOdd) return sorted[n ~/ 2].toDouble();
-  return (sorted[n ~/ 2 - 1] + sorted[n ~/ 2]) / 2.0;
-}
+import '../test/reference_mad.dart';
 
 Future<void> main(List<String> args) async {
   final musicIdx = args.indexOf('--music');
@@ -346,20 +363,20 @@ Future<void> _benchMusic(String dir) async {
 }
 ```
 
-- [ ] **Step 2: Run the synthetic benchmark (baseline)**
+- [ ] **Step 3: Run the synthetic benchmark (baseline)**
 
 Run: `dart run tool/bench_mad.dart`
 Expected: prints MAD ns/op for reference and library (speedup ≈ `1.0x` at this point, since `mad` still sorts) and a `detectDefects` ms/call figure, with **no** `MISMATCH`. Record these baseline numbers in the task's commit message.
 
-- [ ] **Step 3: Confirm static analysis is clean**
+- [ ] **Step 4: Confirm static analysis and formatting are clean**
 
-Run: `dart analyze tool/bench_mad.dart`
-Expected: "No issues found!"
+Run: `dart analyze --fatal-warnings` then `dart format --output=none --set-exit-if-changed .`
+Expected: "No issues found!" and no formatting changes required (CI runs both).
 
-- [ ] **Step 4: Commit**
+- [ ] **Step 5: Commit**
 
 ```bash
-git add tool/bench_mad.dart
+git add test/reference_mad.dart tool/bench_mad.dart
 git commit -m "Add MAD + end-to-end benchmark harness"
 ```
 
@@ -374,27 +391,21 @@ Replaces the two `.sort()` calls inside `mad()` with quickselect. This is a **re
 - Test: `test/math_utils_test.dart`
 
 **Interfaces:**
-- Consumes: existing `mad(Float32List) -> double` public signature (unchanged).
+- Consumes: existing `mad(Float32List) -> double` public signature (unchanged); `referenceMad` from `test/reference_mad.dart` (created in Task 2).
 - Produces: private `_swap`, `_selectKth(Float32List, int lo, int hi, int k) -> double`, `_medianViaSelect(Float32List, int n) -> double` in `math_utils.dart`. No public API change.
 
 - [ ] **Step 1: Write the bit-for-bit equivalence test**
 
-Add to `test/math_utils_test.dart` — add `import 'dart:math' as math;` at the top if absent, and append these groups inside `main()`:
+At the top of `test/math_utils_test.dart` add these imports (if not already present):
 
 ```dart
-  // Frozen sort-based oracle: mad() must stay bit-for-bit identical to this.
-  double referenceMad(Float32List values) {
-    if (values.isEmpty) return 0.0;
-    final sorted = Float32List.fromList(values)..sort();
-    final med = refMedian(sorted);
-    final dev = Float32List(sorted.length);
-    for (int i = 0; i < sorted.length; i++) {
-      dev[i] = (sorted[i] - med).abs();
-    }
-    dev.sort();
-    return refMedian(dev);
-  }
+import 'dart:math' as math;
+import 'reference_mad.dart';
+```
 
+Then append these groups inside `main()`. They use the shared `referenceMad` from `test/reference_mad.dart` — do **not** redefine it here:
+
+```dart
   group('mad quickselect equivalence', () {
     test('bit-for-bit identical to reference across random windows', () {
       final rng = math.Random(1234);
@@ -428,17 +439,6 @@ Add to `test/math_utils_test.dart` — add `import 'dart:math' as math;` at the 
       }
     });
   });
-```
-
-Add this top-level helper alongside `referenceMad` (inside `main()` above the group, or as a top-level function in the file):
-
-```dart
-  double refMedian(Float32List sorted) {
-    final n = sorted.length;
-    if (n == 0) return 0.0;
-    if (n.isOdd) return sorted[n ~/ 2].toDouble();
-    return (sorted[n ~/ 2 - 1] + sorted[n ~/ 2]) / 2.0;
-  }
 ```
 
 - [ ] **Step 2: Run the equivalence test against current (sort-based) `mad`**
