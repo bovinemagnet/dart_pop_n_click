@@ -1,6 +1,9 @@
+import 'dart:math' as math;
 import 'dart:typed_data';
 import 'package:audio_defect_detector/audio_defect_detector.dart';
 import 'package:test/test.dart';
+
+import 'reference_mad.dart';
 
 void main() {
   group('median', () {
@@ -102,6 +105,41 @@ void main() {
       // Deviations: [3, 1, 0, 1, 3], sorted: [0, 1, 1, 3, 3], median = 1
       final values = Float32List.fromList([-3.0, -1.0, 0.0, 1.0, 3.0]);
       expect(mad(values), closeTo(1.0, 0.001));
+    });
+  });
+
+  group('mad quickselect equivalence', () {
+    test('bit-for-bit identical to reference across random windows', () {
+      final rng = math.Random(1234);
+      for (int trial = 0; trial < 5000; trial++) {
+        final n = 1 + rng.nextInt(600);
+        final buf = Float32List(n);
+        for (int i = 0; i < n; i++) {
+          buf[i] = (rng.nextDouble() - 0.5) * 2.0;
+        }
+        expect(mad(buf), equals(referenceMad(buf)),
+            reason: 'n=$n trial=$trial');
+      }
+    });
+
+    test('edge cases identical to reference', () {
+      const cases = <List<double>>[
+        <double>[],
+        [5.0],
+        [3.0, 3.0],
+        [1.0, 2.0],
+        [2.0, 1.0],
+        [1.0, 2.0, 3.0, 4.0],
+        [1.0, 2.0, 3.0, 4.0, 5.0],
+        [1.0, 1.0, 1.0, 1.0, 1.0],
+        [-3.0, -1.0, 0.0, 1.0, 3.0],
+        [1.0, 2.0, 3.0, 4.0, 100.0],
+        [0.0, 10.0],
+      ];
+      for (final c in cases) {
+        final buf = Float32List.fromList(c);
+        expect(mad(buf), equals(referenceMad(buf)), reason: '$c');
+      }
     });
   });
 }
