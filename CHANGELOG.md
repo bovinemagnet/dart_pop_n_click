@@ -2,7 +2,7 @@
 
 ### Performance
 
-- Windowed MAD detection now uses median-of-three quickselect instead of two full sorts, giving a measured 7.4× speedup on the MAD micro-benchmark (~76,400 → ~10,400 ns per call) with bit-identical detections
+- Windowed MAD detection now uses median-of-three quickselect instead of two full sorts, giving a measured 7.4× speedup on the MAD micro-benchmark (~76,400 → ~10,400 ns per call) with bit-identical detections; selection uses a three-way partition so tie-heavy windows (e.g. digital silence) stay linear rather than degrading quadratically
 - Detector's windowed-MAD hot path reuses scratch buffers (no per-window allocation) and shares quickselect selection, yielding a further ~17.5% reduction in end-to-end `detectDefects` time
 - Combined, `detectDefects` on a 30-second mono buffer dropped from ~1,709 ms per call to ~217 ms per call (~7.9×) on the synthetic benchmark
 - `Float32x4` SIMD threshold scan variant was evaluated and not adopted — the scan is memory-bandwidth-bound and showed no measurable end-to-end gain

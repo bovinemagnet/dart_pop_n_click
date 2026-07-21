@@ -155,5 +155,28 @@ void main() {
             reason: 'n=$n distinct=$distinct trial=$trial');
       }
     });
+
+    test('all-zero window is not quadratically slower (digital silence)', () {
+      // Digital silence yields windows where every |diff| is exactly 0.0.
+      // A strict less-than partition degrades to O(n²) there — the range
+      // shrinks by one element per pass. With ~32k elements a quadratic
+      // selection costs hundreds of milliseconds; a tie-aware selection
+      // completes in a single pass (well under a millisecond). The generous
+      // bound keeps the assertion robust on slow CI machines while still
+      // failing decisively on quadratic behaviour.
+      final silence = Float32List(32768); // all zeros
+      // Warm up JIT so the timed runs measure the algorithm, not compilation.
+      mad(silence);
+      var best = Duration(days: 1).inMicroseconds;
+      for (int run = 0; run < 3; run++) {
+        final sw = Stopwatch()..start();
+        mad(silence);
+        sw.stop();
+        if (sw.elapsedMicroseconds < best) best = sw.elapsedMicroseconds;
+      }
+      expect(best, lessThan(250000), // 250 ms
+          reason: 'mad() on a 32768-sample all-zero window took $bestµs — '
+              'quadratic tie degradation');
+    });
   });
 }

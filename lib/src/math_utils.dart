@@ -41,6 +41,11 @@ void _swap(Float32List b, int i, int j) {
 /// equal. Returns `buf[k]`. Uses a median-of-three pivot and iterates rather
 /// than recursing so degenerate inputs cannot exhaust the stack.
 ///
+/// Partitioning is three-way (Dutch national flag: `< pivot`, `== pivot`,
+/// `> pivot`) so that runs of equal values — e.g. the all-zero `|diff|`
+/// windows produced by digital silence — resolve in a single pass instead of
+/// degrading to O(n²) as a strict less-than partition would.
+///
 /// Package-internal: not exported from the public library.
 double selectKth(Float32List buf, int lo, int hi, int k) {
   while (true) {
@@ -50,21 +55,30 @@ double selectKth(Float32List buf, int lo, int hi, int k) {
     if (buf[hi] < buf[lo]) _swap(buf, lo, hi);
     if (buf[hi] < buf[mid]) _swap(buf, mid, hi);
     final pivot = buf[mid];
-    _swap(buf, mid, hi); // park pivot at the end
-    var store = lo;
-    for (int i = lo; i < hi; i++) {
-      if (buf[i] < pivot) {
-        _swap(buf, store, i);
-        store++;
+    // Three-way partition of [lo, hi]:
+    //   [lo, lt) < pivot,  [lt, gt] == pivot,  (gt, hi] > pivot.
+    var lt = lo;
+    var gt = hi;
+    var i = lo;
+    while (i <= gt) {
+      final v = buf[i];
+      if (v < pivot) {
+        _swap(buf, lt, i);
+        lt++;
+        i++;
+      } else if (v > pivot) {
+        _swap(buf, i, gt);
+        gt--;
+      } else {
+        i++;
       }
     }
-    _swap(buf, store, hi); // pivot to its final position
-    if (k == store) {
-      return buf[k];
-    } else if (k < store) {
-      hi = store - 1;
+    if (k < lt) {
+      hi = lt - 1;
+    } else if (k > gt) {
+      lo = gt + 1;
     } else {
-      lo = store + 1;
+      return buf[k]; // k lies in the equal-to-pivot band.
     }
   }
 }
