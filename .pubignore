@@ -1,0 +1,27 @@
+# Published-package exclusions. NOTE: a root .pubignore REPLACES the root
+# .gitignore for `pub publish`, so the .gitignore entries are repeated here.
+
+# Dart build artifacts
+.dart_tool/
+build/
+.packages
+
+# Generated dartdoc output
+doc/api/
+
+# Pub cache
+.pub-cache/
+.pub/
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Local real-music harness output (never committed)
+tool/harness_results/
+
+# Design specs and implementation plans — repository documentation, not
+# package documentation. Also silences pub's "rename docs to doc" layout
+# warning, which fails CI.
+docs/

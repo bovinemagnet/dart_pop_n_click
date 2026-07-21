@@ -37,6 +37,6 @@ models → pcm_decoder → wav/aiff/flac decoders → detector → analyser → 
 
 - SDK constraint: Dart >=3.5.0 <4.0.0
 - Linting: `package:lints/recommended.yaml`
-- Tests use synthetic audio generation (silence, sine waves, injected defects); the only fixture files are the FLAC samples under `test/fixtures/flac/`, regenerable via `dart run tool/generate_flac_fixtures.dart`
+- Tests use synthetic audio generation (silence, sine waves, injected defects); the fixture files are the FLAC samples under `test/fixtures/flac/` (regenerable via `dart run tool/generate_flac_fixtures.dart`) and the detector MAD characterisation golden `test/fixtures/mad_golden.json` (regenerable via `RECORD_GOLDEN=1 dart test test/mad_golden_test.dart`)
 - Public API is exported through `lib/audio_defect_detector.dart`
 - British spelling throughout (e.g. `analyser`, `normalise`)

@@ -202,15 +202,25 @@ Float32List _buildAdaptiveThreshold(
   }
   if (gridIndices.last != n - 1) gridIndices.add(n - 1);
 
+  // Scratch buffers reused across every grid point (a window is at most
+  // `windowSize` samples wide), eliminating per-point allocation.
+  final windowBuf = Float32List(windowSize);
+  final devBuf = Float32List(windowSize);
+
   double madThresholdAt(int i) {
     final start = math.max(0, i - half);
     final end = math.min(n, i + half);
-    final window = Float32List(end - start);
+    final len = end - start;
+    if (len == 0) return _kThresholdFloor;
     for (int j = start; j < end; j++) {
-      window[j - start] = diff[j].abs();
+      windowBuf[j - start] = diff[j].abs();
+    }
+    final med = medianViaSelect(windowBuf, len);
+    for (int k = 0; k < len; k++) {
+      devBuf[k] = (windowBuf[k] - med).abs();
     }
     // MAD → sigma: multiply by consistency factor for normal distribution.
-    final t = mad(window) * _kMadScaleFactor * multiplier;
+    final t = medianViaSelect(devBuf, len) * _kMadScaleFactor * multiplier;
     // Enforce a minimum floor to avoid spurious detections in digital silence.
     return t < _kThresholdFloor ? _kThresholdFloor : t;
   }

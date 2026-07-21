@@ -1,0 +1,3 @@
+# The MAD characterisation golden is compared byte-for-byte against
+# generated output; keep it LF on every platform.
+test/fixtures/mad_golden.json text eol=lf

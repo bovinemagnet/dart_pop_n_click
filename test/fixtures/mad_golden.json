@@ -1,0 +1,141 @@
+[
+  {
+    "name": "silence_44100",
+    "sample_rate": 44100,
+    "defects": []
+  },
+  {
+    "name": "sine_48000",
+    "sample_rate": 48000,
+    "defects": []
+  },
+  {
+    "name": "noise_clicks_44100",
+    "sample_rate": 44100,
+    "defects": [
+      {
+        "offset_ms": 113,
+        "length_ms": 1,
+        "type": "click",
+        "confidence": 1.0,
+        "channel": 0,
+        "sample_index": 5000,
+        "amplitude": 0.8999999761581421
+      },
+      {
+        "offset_ms": 272,
+        "length_ms": 1,
+        "type": "click",
+        "confidence": 1.0,
+        "channel": 0,
+        "sample_index": 12000,
+        "amplitude": 0.8999999761581421
+      },
+      {
+        "offset_ms": 465,
+        "length_ms": 1,
+        "type": "click",
+        "confidence": 1.0,
+        "channel": 0,
+        "sample_index": 20500,
+        "amplitude": 0.8999999761581421
+      },
+      {
+        "offset_ms": 567,
+        "length_ms": 1,
+        "type": "click",
+        "confidence": 0.9999999999999998,
+        "channel": 0,
+        "sample_index": 25000,
+        "amplitude": 0.6000000238418579
+      },
+      {
+        "offset_ms": 567,
+        "length_ms": 1,
+        "type": "click",
+        "confidence": 0.9999999999999991,
+        "channel": 0,
+        "sample_index": 25020,
+        "amplitude": 0.007095278240740299
+      },
+      {
+        "offset_ms": 703,
+        "length_ms": 1,
+        "type": "click",
+        "confidence": 1.0,
+        "channel": 0,
+        "sample_index": 31000,
+        "amplitude": 0.8999999761581421
+      },
+      {
+        "offset_ms": 907,
+        "length_ms": 1,
+        "type": "click",
+        "confidence": 1.0,
+        "channel": 0,
+        "sample_index": 40000,
+        "amplitude": 0.8999999761581421
+      }
+    ]
+  },
+  {
+    "name": "sine_pops_96000",
+    "sample_rate": 96000,
+    "defects": [
+      {
+        "offset_ms": 83,
+        "length_ms": 1,
+        "type": "click",
+        "confidence": 1.0,
+        "channel": 0,
+        "sample_index": 8000,
+        "amplitude": 0.8464101552963257
+      },
+      {
+        "offset_ms": 83,
+        "length_ms": 1,
+        "type": "click",
+        "confidence": 1.0,
+        "channel": 0,
+        "sample_index": 8012,
+        "amplitude": 0.3068660497665405
+      },
+      {
+        "offset_ms": 229,
+        "length_ms": 1,
+        "type": "click",
+        "confidence": 1.0,
+        "channel": 0,
+        "sample_index": 22000,
+        "amplitude": 0.699999988079071
+      },
+      {
+        "offset_ms": 229,
+        "length_ms": 1,
+        "type": "click",
+        "confidence": 1.0,
+        "channel": 0,
+        "sample_index": 22029,
+        "amplitude": 0.04233207926154137
+      },
+      {
+        "offset_ms": 365,
+        "length_ms": 1,
+        "type": "click",
+        "confidence": 1.0,
+        "channel": 0,
+        "sample_index": 35000,
+        "amplitude": 0.8863703012466431
+      },
+      {
+        "offset_ms": 365,
+        "length_ms": 1,
+        "type": "click",
+        "confidence": 1.0,
+        "channel": 0,
+        "sample_index": 35030,
+        "amplitude": 0.3942224383354187
+      }
+    ]
+  }
+]

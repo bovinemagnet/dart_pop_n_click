@@ -20,7 +20,7 @@ library;
 export 'src/aiff_decoder.dart';
 export 'src/analyser.dart';
 export 'src/flac_decoder.dart';
-export 'src/math_utils.dart';
+export 'src/math_utils.dart' show median, mad;
 export 'src/models.dart';
 export 'src/pcm_decoder.dart';
 export 'src/version.dart';
