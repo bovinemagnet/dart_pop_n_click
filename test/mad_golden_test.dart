@@ -97,6 +97,11 @@ void main() {
       goldenFile.writeAsStringSync('$current\n');
       fail('Golden (re)written to ${goldenFile.path}; commit it and re-run.');
     }
-    expect(current, equals(goldenFile.readAsStringSync().trimRight()));
+    // Normalise line endings: on Windows, git's autocrlf may check the
+    // golden out with CRLF while encodeGolden() always emits LF. The
+    // comparison is about JSON content, not physical line endings.
+    final golden =
+        goldenFile.readAsStringSync().replaceAll('\r\n', '\n').trimRight();
+    expect(current, equals(golden));
   });
 }
